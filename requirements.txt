@@ -9,17 +9,23 @@ tushare>=1.2.0
 
 # 数据库
 sqlalchemy>=2.0.0
-pymongo>=4.5.0
-redis>=5.0.0
+psycopg2-binary>=2.9.0       # PostgreSQL
+pymysql>=1.1.0               # MySQL（通联）
+pymongo>=4.5.0               # MongoDB
+redis>=5.0.0                 # Redis
 
-# 配置管理
+# 万得Wind（注释掉，需要本地安装）
+# WindPy>=1.0.0              # 万得API，需从Wind终端安装
+
+# 配置管理 (pydantic v2需要)
+pydantic-settings>=2.0.0
 pyyaml>=6.0.1
 pydantic>=2.4.0
 python-dotenv>=1.0.0
 
 # 资产配置模型
 pyportfolioopt>=1.5.0
-riskfolio-lib>=6.0.0
+# riskfolio-lib>=6.0.0       # 如有依赖问题可注释掉
 scipy>=1.11.0
 scikit-learn>=1.3.0
 
