@@ -22,6 +22,7 @@ class FTPSource(DataSourceBase):
     """FTP文件数据源
 
     从FTP服务器读取数据文件，支持多种格式
+    数据获取能力取决于FTP上的文件组织方式
 
     Attributes:
         host: FTP服务器地址
@@ -30,6 +31,13 @@ class FTPSource(DataSourceBase):
         password: 密码
         ftp: FTP连接对象
     """
+
+    # FTP数据能力取决于文件组织方式，默认假设标准目录结构
+    supports_daily_price = True      # 假设有 /daily/ 目录
+    supports_minute_price = True     # 假设有 /minute/ 目录
+    supports_fundamentals = True     # 假设有 /fundamentals/ 目录
+    supports_index_components = True # 假设有 /index_components/ 目录
+    supports_trade_calendar = True   # 假设有 /calendar/ 目录
 
     SUPPORTED_FORMATS = ['.csv', '.xlsx', '.xls', '.parquet', '.json', '.txt']
 

@@ -25,6 +25,12 @@ class DolphinDBSource(DataSourceBase):
         is_connected: 连接状态
     """
 
+    supports_daily_price = True
+    supports_minute_price = True
+    supports_fundamentals = False
+    supports_index_components = True
+    supports_trade_calendar = True
+
     def __init__(self):
         super().__init__()
         self.settings = get_settings()

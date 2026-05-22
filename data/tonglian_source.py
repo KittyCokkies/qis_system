@@ -19,11 +19,18 @@ class TonglianSource(DataSourceBase):
     """通联数据库数据源
 
     通过SQL直连通联MySQL数据库获取数据
+    支持：日频行情、财务数据、指数成分、交易日历
 
     Attributes:
         engine: SQLAlchemy引擎
         conn: 数据库连接
     """
+
+    supports_daily_price = True
+    supports_minute_price = False  # 暂不支持分钟数据
+    supports_fundamentals = True
+    supports_index_components = True
+    supports_trade_calendar = True
 
     def __init__(self):
         super().__init__()

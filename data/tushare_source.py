@@ -16,6 +16,12 @@ class TushareSource(DataSourceBase):
     适合需要高质量数据的场景
     """
 
+    supports_daily_price = True
+    supports_minute_price = True  # 需要高级权限
+    supports_fundamentals = True
+    supports_index_components = True
+    supports_trade_calendar = True
+
     def __init__(self, token: Optional[str] = None):
         super().__init__()
         settings = get_settings()

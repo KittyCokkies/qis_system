@@ -8,10 +8,22 @@ import pandas as pd
 class DataSourceBase(ABC):
     """数据源抽象基类
 
-    所有数据源（Tushare、AKShare、本地数据库等）都需要实现这个接口
+    定义数据源的标准接口。子类只需要实现其支持的方法，
+    不支持的接口可以保持默认行为（返回空数据或抛出异常）。
+
+    子类应该通过构造函数或属性标明自己支持哪些数据类型：
+        supports_price = True/False  # 是否支持行情数据
+        supports_fundamentals = True/False  # 是否支持财务数据
+        supports_minute = True/False  # 是否支持分钟数据
     """
 
-    @abstractmethod
+    # 数据源能力标识（子类应重写）
+    supports_daily_price = True
+    supports_minute_price = False
+    supports_fundamentals = False
+    supports_index_components = False
+    supports_trade_calendar = False
+
     def get_daily_price(
         self,
         symbol: Union[str, List[str]],
@@ -30,9 +42,10 @@ class DataSourceBase(ABC):
         Returns:
             DataFrame with columns: [symbol, date, open, high, low, close, volume, ...]
         """
-        pass
+        if not self.supports_daily_price:
+            raise NotImplementedError(f"{self.__class__.__name__} does not support daily price data")
+        return pd.DataFrame()
 
-    @abstractmethod
     def get_minute_price(
         self,
         symbol: str,
@@ -51,9 +64,10 @@ class DataSourceBase(ABC):
         Returns:
             DataFrame with OHLCV data
         """
-        pass
+        if not self.supports_minute_price:
+            raise NotImplementedError(f"{self.__class__.__name__} does not support minute price data")
+        return pd.DataFrame()
 
-    @abstractmethod
     def get_fundamentals(
         self,
         symbol: Union[str, List[str]],
@@ -70,9 +84,10 @@ class DataSourceBase(ABC):
         Returns:
             DataFrame with fundamental data
         """
-        pass
+        if not self.supports_fundamentals:
+            raise NotImplementedError(f"{self.__class__.__name__} does not support fundamental data")
+        return pd.DataFrame()
 
-    @abstractmethod
     def get_index_components(self, index_code: str, date: Optional[datetime] = None) -> List[str]:
         """获取指数成分股
 
@@ -83,9 +98,10 @@ class DataSourceBase(ABC):
         Returns:
             成分股代码列表
         """
-        pass
+        if not self.supports_index_components:
+            raise NotImplementedError(f"{self.__class__.__name__} does not support index components")
+        return []
 
-    @abstractmethod
     def get_trade_calendar(
         self,
         start_date: Optional[datetime] = None,
@@ -102,7 +118,9 @@ class DataSourceBase(ABC):
         Returns:
             DataFrame with trade dates
         """
-        pass
+        if not self.supports_trade_calendar:
+            raise NotImplementedError(f"{self.__class__.__name__} does not support trade calendar")
+        return pd.DataFrame()
 
     def normalize_symbol(self, symbol: str) -> str:
         """标准化标的代码

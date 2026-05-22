@@ -18,11 +18,18 @@ class SwifquantSource(DataSourceBase):
     """Swifquant 数据库数据源
 
     通过 SQL 直连 swifquant MySQL 数据库获取数据
+    支持：日频行情（表结构待确认）
 
     Attributes:
         engine: SQLAlchemy 引擎
         conn: 数据库连接
     """
+
+    supports_daily_price = True
+    supports_minute_price = False  # 待确认表结构
+    supports_fundamentals = False  # 待确认表结构
+    supports_index_components = False  # 待确认表结构
+    supports_trade_calendar = False  # 待确认表结构
 
     def __init__(self):
         super().__init__()

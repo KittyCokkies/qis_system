@@ -28,6 +28,12 @@ class WindSource(DataSourceBase):
         is_connected: 是否已连接
     """
 
+    supports_daily_price = True
+    supports_minute_price = True
+    supports_fundamentals = True
+    supports_index_components = True
+    supports_trade_calendar = True
+
     def __init__(self):
         super().__init__()
         self.w = None
