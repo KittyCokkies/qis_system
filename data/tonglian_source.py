@@ -399,6 +399,18 @@ class TonglianSource(DataSourceBase):
         logger.warning("Tonglian minute data not yet implemented")
         return pd.DataFrame()
 
+    def raw_query(self, sql: str, params: Optional[dict] = None) -> pd.DataFrame:
+        """执行原始 SQL 查询（用于探索性查询或复杂联合查询）
+
+        Args:
+            sql: SQL 查询语句
+            params: 查询参数
+
+        Returns:
+            查询结果 DataFrame
+        """
+        return self._execute_query(sql, params)
+
     def test_connection(self) -> bool:
         """测试连接"""
         try:
