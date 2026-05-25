@@ -538,23 +538,33 @@ class FutureRolloverAnalyzer:
         underlying: str,
         start_date: Optional[Union[str, datetime]] = None,
         end_date: Optional[Union[str, datetime]] = None,
-        roll_days_before_expiry: int = 5,
+        roll_start_days: int = 10,
+        roll_end_days: int = 3,
         price_type: RolloverPriceType = RolloverPriceType.CLOSE,
     ) -> pd.DataFrame:
         """固定日历换月策略（连续合约构建）
 
-        最简单的换月方式：
-        1. 不根据持仓量判断主力合约
-        2. 按合约到期月份固定顺序切换
-        3. 到期前固定天数（如5天）换到下月合约
+        支持双窗口控制的展期策略：
+        1. roll_start_days (p): 到期前p日开始考虑换仓（避免过早换仓）
+        2. roll_end_days (q): 到期前q日必须换仓（避免过晚换仓）
+        3. p > q，中间为观察窗口
 
-        例如：IF2401（1月到期） -> 到期前5天换成 IF2402 -> IF2403 ...
+        换仓规则：
+        - 到期日 > p: 持有当月合约（不换仓）
+        - q < 到期日 <= p: 观察窗口，可择机换仓（此版本固定换仓）
+        - 到期日 <= q: 强制换仓到下月合约
+
+        例如 p=10, q=3：
+        - IF2401到期前10天：继续持有IF2401
+        - IF2401到期前10天到3天之间：开始观察，准备换仓
+        - IF2401到期前3天：强制换成IF2402
 
         Args:
             underlying: 标的品种代码，如 "IF"、"AU"
             start_date: 起始日期
             end_date: 结束日期
-            roll_days_before_expiry: 到期前N天换月（默认5天）
+            roll_start_days: 开始观察窗口p（到期前p日开始考虑换仓）
+            roll_end_days: 强制换仓窗口q（到期前q日必须换仓）
             price_type: 结算价格类型（close/settlement）
 
         Returns:
@@ -612,24 +622,46 @@ class FutureRolloverAnalyzer:
 
             tradable = tradable.sort_values('last_trade_date')
 
-            # 查找当前应持有的合约
-            current_candidates = tradable[tradable['days_to_expiry'] >= roll_days_before_expiry]
+            # 双窗口控制的展期逻辑
+            # 获取最近到期合约（当月合约）
+            if len(tradable) == 0:
+                continue
 
-            if len(current_candidates) > 0:
-                current_row = current_candidates.iloc[0]
+            first_contract = tradable.iloc[0]  # 最近到期的合约
+            days_to_first = first_contract['days_to_expiry']
+
+            # 判断当前应持有哪个合约
+            if days_to_first > roll_start_days:
+                # 到期日 > p: 继续持有当月合约（不换仓期）
+                current_row = first_contract
                 is_rollover = False
-            else:
-                # 换月到次月合约
-                if len(tradable) > 0:
-                    current_row = tradable.iloc[0]
-                    next_candidates = tradable[tradable['last_trade_date'] > current_row['last_trade_date']]
-                    if len(next_candidates) > 0:
-                        current_row = next_candidates.iloc[0]
-                        is_rollover = True
-                    else:
-                        continue
+                rollover_type = 'hold'
+            elif roll_end_days < days_to_first <= roll_start_days:
+                # q < 到期日 <= p: 观察窗口期
+                # 此版本固定换仓：进入观察窗口即换仓
+                # 可扩展为：根据流动性指标判断是否换仓
+                current_candidates = tradable[tradable['days_to_expiry'] > roll_end_days]
+                if len(current_candidates) > 1:
+                    # 换到次月合约
+                    current_row = current_candidates.iloc[1]
+                    is_rollover = True
+                    rollover_type = 'observation_roll'
                 else:
-                    continue
+                    current_row = first_contract
+                    is_rollover = False
+                    rollover_type = 'hold'
+            else:
+                # 到期日 <= q: 强制换仓期
+                if len(tradable) > 1:
+                    # 强制换到下月合约
+                    current_row = tradable.iloc[1]
+                    is_rollover = True
+                    rollover_type = 'forced_roll'
+                else:
+                    # 没有下月合约，只能继续持有
+                    current_row = first_contract
+                    is_rollover = False
+                    rollover_type = 'hold_last'
 
             # 查找下月合约（用于计算展期收益）
             next_candidates = tradable[tradable['last_trade_date'] > current_row['last_trade_date']]
@@ -658,7 +690,8 @@ class FutureRolloverAnalyzer:
                 'price_diff': price_diff,
                 'rollover_return': rollover_return,
                 'days_to_expiry': current_row['days_to_expiry'],
-                'is_rollover_day': is_rollover if len(current_candidates) == 0 else False,
+                'is_rollover_day': is_rollover,
+                'rollover_type': rollover_type,
                 'volume': current_row.get('volume'),
                 'open_interest': current_row.get('open_interest'),
             })
