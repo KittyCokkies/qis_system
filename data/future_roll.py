@@ -57,7 +57,7 @@ class FutureRollAnalyzer:
     - 自定义展期价格和换仓信号
 
     Example:
-        >>> analyzer = FutureRolloverAnalyzer()
+        >>> analyzer = FutureRollAnalyzer()
         >>> # 计算单品种展期收益
         >>> df = analyzer.calculate_roll_return("IF", "2024-01-01", "2024-12-31")
         >>> # 批量计算所有股指期货
@@ -88,7 +88,7 @@ class FutureRollAnalyzer:
         """
         self.source = source or TonglianSource()
         self.config = RollConfig()
-        logger.info("FutureRolloverAnalyzer initialized")
+        logger.info("FutureRollAnalyzer initialized")
 
     def get_future_contracts(
         self,
@@ -261,7 +261,7 @@ class FutureRollAnalyzer:
     def identify_main_contract(
         self,
         df: pd.DataFrame,
-        signal_type: Optional[RolloverSignalType] = None
+        signal_type: Optional[RollSignalType] = None
     ) -> pd.DataFrame:
         """识别每日主力合约
 
@@ -283,13 +283,13 @@ class FutureRollAnalyzer:
                 continue
 
             # 计算主力合约评分
-            if signal_type == RolloverSignalType.OPEN_INTEREST:
+            if signal_type == RollSignalType.OPEN_INTEREST:
                 group['score'] = group['open_interest']
-            elif signal_type == RolloverSignalType.VOLUME:
+            elif signal_type == RollSignalType.VOLUME:
                 group['score'] = group['volume']
-            elif signal_type == RolloverSignalType.LIQUIDITY:
+            elif signal_type == RollSignalType.LIQUIDITY:
                 group['score'] = group['open_interest'] * group['volume']
-            elif signal_type == RolloverSignalType.COMBINED:
+            elif signal_type == RollSignalType.COMBINED:
                 weights = self.config.weights
                 # 标准化
                 oi_norm = group['open_interest'] / group['open_interest'].max() if group['open_interest'].max() > 0 else 0
@@ -316,8 +316,8 @@ class FutureRollAnalyzer:
         underlying: str,
         start_date: Optional[Union[str, datetime]] = None,
         end_date: Optional[Union[str, datetime]] = None,
-        price_type: Optional[RolloverPriceType] = None,
-        signal_type: Optional[RolloverSignalType] = None,
+        price_type: Optional[RollPriceType] = None,
+        signal_type: Optional[RollSignalType] = None,
     ) -> pd.DataFrame:
         """计算展期收益序列
 
@@ -356,7 +356,7 @@ class FutureRollAnalyzer:
             start_date = end_date - timedelta(days=365)
 
         price_type = price_type or self.config.price_type
-        price_col = 'close' if price_type == RolloverPriceType.CLOSE else 'settle'
+        price_col = 'close' if price_type == RollPriceType.CLOSE else 'settle'
 
         # 1. 获取数据
         df = self.get_future_daily_with_info(underlying, start_date, end_date)
@@ -540,7 +540,7 @@ class FutureRollAnalyzer:
         end_date: Optional[Union[str, datetime]] = None,
         roll_start_days: int = 10,
         roll_end_days: int = 3,
-        price_type: RolloverPriceType = RolloverPriceType.CLOSE,
+        price_type: RollPriceType = RollPriceType.CLOSE,
     ) -> pd.DataFrame:
         """固定日历换月策略（连续合约构建）
 
@@ -579,7 +579,7 @@ class FutureRollAnalyzer:
         if start_date is None:
             start_date = end_date - timedelta(days=365)
 
-        price_col = 'close' if price_type == RolloverPriceType.CLOSE else 'settle'
+        price_col = 'close' if price_type == RollPriceType.CLOSE else 'settle'
 
         # 1. 获取所有合约信息
         contracts = self.get_future_contracts(underlying, start_date, end_date)
@@ -733,8 +733,8 @@ class RolloverStrategyAdapter:
     为CTA策略提供标准化的展期收益数据接口
     """
 
-    def __init__(self, analyzer: Optional[FutureRolloverAnalyzer] = None):
-        self.analyzer = analyzer or FutureRolloverAnalyzer()
+    def __init__(self, analyzer: Optional[FutureRollAnalyzer] = None):
+        self.analyzer = analyzer or FutureRollAnalyzer()
 
     def get_roll_yield_factor(
         self,

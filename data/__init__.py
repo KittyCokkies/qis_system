@@ -11,7 +11,7 @@ from data.cache import DataCache
 from data.data_manager import DataManager
 from data.future_roll import (
     FutureRollAnalyzer,
-    RollStrategyAdapter,
+    RolloverStrategyAdapter,
     RollConfig,
     RollPriceType,
     RollSignalType,
@@ -30,7 +30,7 @@ __all__ = [
     "DataCache",
     "DataManager",
     "FutureRollAnalyzer",
-    "RollStrategyAdapter",
+    "RolloverStrategyAdapter",
     "RollConfig",
     "RollPriceType",
     "RollSignalType",

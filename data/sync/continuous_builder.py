@@ -10,7 +10,7 @@ from typing import Optional, List
 from loguru import logger
 
 from data.config.loader import AssetConfigLoader
-from data.config.models import RollConfig, RolloverType, PriceType
+from data.config.models import RolloverConfig, RollType, PriceType
 from data.database import DatabaseManager
 from data.future_roll import FutureRollAnalyzer
 
@@ -21,7 +21,7 @@ class ContinuousContractBuilder:
     def __init__(self):
         self.db = DatabaseManager()
         self.config_loader = AssetConfigLoader()
-        self.roll_analyzer = FutureRolloverAnalyzer()
+        self.roll_analyzer = FutureRollAnalyzer()
 
     def build_for_date(self, config_id: str, build_date: date) -> int:
         """
@@ -82,7 +82,7 @@ class ContinuousContractBuilder:
                     roll_type = 'forced_roll'
                 elif days_to_expiry <= config.roll_start_days:
                     # Observation window - check dynamic conditions if applicable
-                    if config.roll_type == RolloverType.DYNAMIC:
+                    if config.roll_type == RollType.DYNAMIC:
                         if self._should_roll_dynamic(underlying, current_contract, next_contract, build_date, config):
                             is_roll_day = True
                             roll_type = 'observation_roll'
@@ -170,7 +170,7 @@ class ContinuousContractBuilder:
         underlying: str,
         contracts: List[str],
         query_date: date,
-        config: RollConfig
+        config: RolloverConfig
     ) -> tuple:
         """
         Determine current and next contracts
@@ -228,7 +228,7 @@ class ContinuousContractBuilder:
         current_contract: str,
         next_contract: str,
         query_date: date,
-        config: RollConfig
+        config: RolloverConfig
     ) -> bool:
         """
         Check if should roll based on dynamic conditions

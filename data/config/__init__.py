@@ -6,7 +6,7 @@ QIS System - Asset Configuration Module
 
 from data.config.models import (
     Exchange,
-    RolloverType,
+    RollType,
     PriceType,
     RolloverConfig,
     FutureAsset,
@@ -18,7 +18,7 @@ from data.config.loader import AssetConfigLoader
 
 __all__ = [
     "Exchange",
-    "RolloverType",
+    "RollType",
     "PriceType",
     "RolloverConfig",
     "FutureAsset",
