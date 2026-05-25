@@ -106,7 +106,7 @@ class TonglianSource(DataSourceBase):
         symbols = [s.replace(".SH", "").replace(".SZ", "").replace(".CF", "").replace(".CFE", "") for s in symbol]
         symbol_str = "','".join(symbols)
 
-        # 字段映射（根据通联实际表结构调整）
+        # 字段映射（通联实际字段名 - 下划线大写格式）
         field_mapping = {
             "open": "OPEN_PRICE",
             "high": "HIGHEST_PRICE",
@@ -171,16 +171,16 @@ class TonglianSource(DataSourceBase):
 
         # 常用财务字段
         field_mapping = {
-            "eps": "BASIC_EPS",
+            "eps": "BasicEPS",
             "bps": "BPS",
             "roe": "ROE",
             "roa": "ROA",
-            "gross_margin": "GROSS_PROFIT_MARGIN",
-            "net_margin": "NET_PROFIT_MARGIN",
-            "revenue": "TOT_OPER_REV",
-            "net_income": "NET_PROFIT",
-            "total_assets": "TOT_ASSETS",
-            "equity": "TOT_EQUITY",
+            "gross_margin": "GrossProfitMargin",
+            "net_margin": "NetProfitMargin",
+            "revenue": "TotOperRev",
+            "net_income": "NetProfit",
+            "total_assets": "TotAssets",
+            "equity": "TotEquity",
         }
 
         if fields:
@@ -194,14 +194,14 @@ class TonglianSource(DataSourceBase):
 
         sql = f"""
             SELECT
-                SECURITY_ID as symbol,
-                END_DATE as report_date,
+                TickerSymbol as symbol,
+                EndDate as report_date,
                 {field_str}
             FROM fdmt_main_data
-            WHERE SECURITY_ID IN ('{symbol_str}')
-            AND END_DATE <= '{report_date}'
-            AND REPORT_TYPE = 'A'  -- 年报
-            ORDER BY END_DATE DESC
+            WHERE TickerSymbol IN ('{symbol_str}')
+            AND EndDate <= '{report_date}'
+            AND ReportType = 'A'  -- 年报
+            ORDER BY EndDate DESC
         """
 
         df = self._execute_query(sql)
@@ -225,14 +225,14 @@ class TonglianSource(DataSourceBase):
 
         sql = f"""
             SELECT
-                CONS_ID as symbol
+                ConsTickerSymbol as symbol
             FROM idx_cons
-            WHERE INDEX_ID = '{index_code}'
-            AND TRADE_DATE = (
-                SELECT MAX(TRADE_DATE)
+            WHERE IndexTickerSymbol = '{index_code}'
+            AND TradeDate = (
+                SELECT MAX(TradeDate)
                 FROM idx_cons
-                WHERE INDEX_ID = '{index_code}'
-                AND TRADE_DATE <= '{query_date}'
+                WHERE IndexTickerSymbol = '{index_code}'
+                AND TradeDate <= '{query_date}'
             )
         """
 
@@ -263,12 +263,12 @@ class TonglianSource(DataSourceBase):
 
         sql = f"""
             SELECT
-                CALENDAR_DATE as date,
-                IS_OPEN as is_trading_day
+                CalendarDate as date,
+                IsOpen as is_trading_day
             FROM md_calendar
-            WHERE EXCHANGE_CD = '{exchange}'
-            AND CALENDAR_DATE BETWEEN '{start_str}' AND '{end_str}'
-            ORDER BY CALENDAR_DATE
+            WHERE ExchangeCode = '{exchange}'
+            AND CalendarDate BETWEEN '{start_str}' AND '{end_str}'
+            ORDER BY CalendarDate
         """
 
         df = self._execute_query(sql)
@@ -293,14 +293,13 @@ class TonglianSource(DataSourceBase):
 
         sql = f"""
             SELECT
-                SECURITY_ID as symbol,
-                SECURITY_NAME_ABBR as name,
-                LIST_DATE as list_date,
-                DELIST_DATE as delist_date
-            FROM sec_main
-            WHERE EXCHANGE_CD IN ('{exchanges}')
-            AND ASSET_CLASS = 'E'  -- 股票
-            AND DELIST_DATE IS NULL  -- 未退市
+                TickerSymbol as symbol,
+                ShortName as name,
+                ListDate as list_date,
+                DelistDate as delist_date
+            FROM sec_equity
+            WHERE ExchangeCode IN ('{exchanges}')
+            AND DelistDate IS NULL  -- 未退市
         """
 
         return self._execute_query(sql)
@@ -313,25 +312,29 @@ class TonglianSource(DataSourceBase):
     ) -> pd.DataFrame:
         """获取期货日行情
 
-        表: mkt_futd
+        表: mkt_futd (期货日行情表)
+        关键字段: TICKER_SYMBOL(合约代码), TRADE_DATE(交易日期), CONTRACT_OBJECT(品种)
         """
         start_str = start_date.strftime("%Y-%m-%d") if start_date else "2000-01-01"
         end_str = end_date.strftime("%Y-%m-%d") if end_date else datetime.now().strftime("%Y-%m-%d")
 
         sql = f"""
             SELECT
-                SECURITY_ID as symbol,
+                TICKER_SYMBOL as symbol,
                 TRADE_DATE as date,
                 OPEN_PRICE as open,
-                HIGH_PRICE as high,
-                LOW_PRICE as low,
+                HIGHEST_PRICE as high,
+                LOWEST_PRICE as low,
                 CLOSE_PRICE as close,
+                SETTL_PRICE as settle,
                 TURNOVER_VOL as volume,
                 TURNOVER_VALUE as amount,
-                OPEN_INTEREST as open_interest,
-                SETTLEMENT_PRICE as settlement
+                OPEN_INT as open_interest,
+                LAST_TRADE_DATE as expiry_date,
+                MAINCON as is_main_contract,
+                SMAINCON as is_sub_main_contract
             FROM mkt_futd
-            WHERE SECURITY_ID = '{symbol}'
+            WHERE TICKER_SYMBOL = '{symbol}'
             AND TRADE_DATE BETWEEN '{start_str}' AND '{end_str}'
             ORDER BY TRADE_DATE
         """
@@ -340,6 +343,81 @@ class TonglianSource(DataSourceBase):
 
         if not df.empty:
             df["date"] = pd.to_datetime(df["date"])
+            df["expiry_date"] = pd.to_datetime(df["expiry_date"])
+
+        return df
+
+    def get_future_contracts(
+        self,
+        contract_object: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> pd.DataFrame:
+        """获取期货合约列表及基本信息
+
+        从 mkt_futd 表中提取合约信息，包含 CONTRACT_OBJECT, TICKER_SYMBOL, LAST_TRADE_DATE
+        """
+        sql = f"""
+            SELECT DISTINCT
+                TICKER_SYMBOL as symbol,
+                CONTRACT_OBJECT as underlying,
+                LAST_TRADE_DATE as last_trade_date,
+                EXCHANGE_CD as exchange
+            FROM mkt_futd
+            WHERE CONTRACT_OBJECT = '{contract_object}'
+        """
+
+        if start_date:
+            sql += f" AND LAST_TRADE_DATE >= '{start_date.strftime('%Y-%m-%d')}'"
+        if end_date:
+            sql += f" AND LAST_TRADE_DATE <= '{end_date.strftime('%Y-%m-%d')}'"
+
+        sql += " ORDER BY LAST_TRADE_DATE"
+
+        df = self._execute_query(sql)
+
+        if not df.empty:
+            df["last_trade_date"] = pd.to_datetime(df["last_trade_date"])
+
+        return df
+
+    def get_contracts_by_date(
+        self,
+        contract_object: str,
+        trade_date: datetime
+    ) -> pd.DataFrame:
+        """获取某品种在特定日期的所有合约数据
+
+        表: mkt_futd
+        """
+        date_str = trade_date.strftime("%Y-%m-%d")
+
+        sql = f"""
+            SELECT
+                TICKER_SYMBOL as symbol,
+                TRADE_DATE as date,
+                OPEN_PRICE as open,
+                HIGHEST_PRICE as high,
+                LOWEST_PRICE as low,
+                CLOSE_PRICE as close,
+                SETTL_PRICE as settle,
+                TURNOVER_VOL as volume,
+                TURNOVER_VALUE as amount,
+                OPEN_INT as open_interest,
+                LAST_TRADE_DATE as expiry_date,
+                MAINCON as is_main_contract,
+                SMAINCON as is_sub_main_contract
+            FROM mkt_futd
+            WHERE CONTRACT_OBJECT = '{contract_object}'
+            AND TRADE_DATE = '{date_str}'
+            ORDER BY TICKER_SYMBOL
+        """
+
+        df = self._execute_query(sql)
+
+        if not df.empty:
+            df["date"] = pd.to_datetime(df["date"])
+            df["expiry_date"] = pd.to_datetime(df["expiry_date"])
 
         return df
 
@@ -358,23 +436,23 @@ class TonglianSource(DataSourceBase):
 
         sql = f"""
             SELECT
-                SECURITY_ID as symbol,
-                TRADE_DATE as date,
-                OPEN_PRICE as open,
-                HIGH_PRICE as high,
-                LOW_PRICE as low,
-                CLOSE_PRICE as close,
-                TURNOVER_VOL as volume,
-                TURNOVER_VALUE as amount,
-                OPEN_INTEREST as open_interest,
-                PRE_SETTLEMENT_PRICE as pre_settlement,
-                SETTLEMENT_PRICE as settlement,
-                EXERCISE_PRICE as strike,
-                EXPIRE_DATE as expiry
+                TickerSymbol as symbol,
+                TradeDate as date,
+                OpenPrice as open,
+                HighPrice as high,
+                LowPrice as low,
+                ClosePrice as close,
+                TurnoverVol as volume,
+                TurnoverValue as amount,
+                OpenInterest as open_interest,
+                PreSettlementPrice as pre_settlement,
+                SettlementPrice as settlement,
+                ExercisePrice as strike,
+                ExpireDate as expiry
             FROM mkt_optd
-            WHERE SECURITY_ID = '{symbol}'
-            AND TRADE_DATE BETWEEN '{start_str}' AND '{end_str}'
-            ORDER BY TRADE_DATE
+            WHERE TickerSymbol = '{symbol}'
+            AND TradeDate BETWEEN '{start_str}' AND '{end_str}'
+            ORDER BY TradeDate
         """
 
         df = self._execute_query(sql)
@@ -415,7 +493,7 @@ class TonglianSource(DataSourceBase):
         """测试连接"""
         try:
             with self.engine.connect() as conn:
-                result = conn.execute(text("SELECT COUNT(*) FROM sec_main LIMIT 1"))
+                result = conn.execute(text("SELECT COUNT(*) FROM mkt_futd LIMIT 1"))
                 count = result.scalar()
                 logger.info(f"Tonglian connection test passed. Sample count: {count}")
                 return True

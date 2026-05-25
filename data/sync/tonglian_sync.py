@@ -10,7 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from data.tonglian_source import TonglianSource
-from data.config.loader import AssetConfigLoader, RollConfig
+from data.config.loader import AssetConfigLoader, RolloverConfig
 from data.database import DatabaseManager
 
 
@@ -70,29 +70,9 @@ class TonglianSync:
             raise ValueError(f"Unknown underlying: {underlying}")
 
         # Query Tonglian for all contracts of this underlying on this date
-        # This is a placeholder - actual implementation depends on Tonglian schema
-        query = """
-            SELECT
-                symbol,
-                trade_date as date,
-                open_price as open,
-                high_price as high,
-                low_price as low,
-                close_price as close,
-                settle_price as settle,
-                volume,
-                amount,
-                open_interest
-            FROM CMPT_FutureDailyPrice
-            WHERE underlying = %s AND trade_date = %s
-        """
+        # Uses mkt_futd table with TICKER_SYMBOL, TRADE_DATE, CONTRACT_OBJECT fields
+        df = self.source.get_contracts_by_date(underlying, sync_date)
 
-        try:
-            df = self.source.raw_query(query, (underlying, sync_date))
-        except Exception as e:
-            logger.error(f"Failed to query Tonglian: {e}")
-            # Return 0 for now - in production should handle this better
-            return 0
 
         if df.empty:
             logger.debug(f"No data for {underlying} on {sync_date}")
