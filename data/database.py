@@ -41,52 +41,38 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def save_daily_price(self, df: pd.DataFrame) -> bool:
-        """保存日频行情数据
+    # ==================== 股票价格表操作 ====================
+
+    def save_stock_prices(self, df: pd.DataFrame) -> bool:
+        """保存股票价格数据（前复权）
 
         Args:
-            df: DataFrame with columns [symbol, date, open, high, low, close, volume, ...]
-
-        Returns:
-            是否保存成功
+            df: DataFrame with columns [symbol, date, open, high, low, close, volume, amount, adj_factor, ...]
         """
         if df.empty:
-            logger.warning("Empty dataframe, nothing to save")
             return False
-
         try:
-            df.to_sql(
-                "daily_price",
-                self.engine,
-                if_exists="append",
-                index=False,
-                method="multi"
-            )
-            logger.info(f"Saved {len(df)} rows to daily_price")
+            df.to_sql("prices_stock", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to prices_stock")
             return True
         except Exception as e:
-            logger.error(f"Failed to save daily price: {e}")
+            logger.error(f"Failed to save stock prices: {e}")
             return False
 
-    def get_daily_price(
+    def get_stock_prices(
         self,
         symbol: Union[str, List[str]],
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         fields: Optional[List[str]] = None
     ) -> pd.DataFrame:
-        """从数据库查询日频行情数据"""
+        """查询股票价格"""
         if isinstance(symbol, str):
             symbol = [symbol]
-
         symbols_str = ",".join([f"'{s}'" for s in symbol])
         field_str = ",".join(fields) if fields else "*"
 
-        sql = f"""
-            SELECT {field_str} FROM daily_price
-            WHERE symbol IN ({symbols_str})
-        """
-
+        sql = f"SELECT {field_str} FROM prices_stock WHERE symbol IN ({symbols_str})"
         params = {}
         if start_date:
             sql += " AND date >= :start_date"
@@ -94,10 +80,201 @@ class DatabaseManager:
         if end_date:
             sql += " AND date <= :end_date"
             params["end_date"] = end_date
-
         sql += " ORDER BY date"
 
         with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    # ==================== 期货价格表操作 ====================
+
+    def save_future_prices(self, df: pd.DataFrame) -> bool:
+        """保存期货原始合约价格数据"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("prices_future", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to prices_future")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save future prices: {e}")
+            return False
+
+    def get_future_prices(
+        self,
+        symbol: Union[str, List[str]],
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """查询期货原始合约价格"""
+        if isinstance(symbol, str):
+            symbol = [symbol]
+        symbols_str = ",".join([f"'{s}'" for s in symbol])
+
+        sql = f"SELECT * FROM prices_future WHERE symbol IN ({symbols_str})"
+        params = {}
+        if start_date:
+            sql += " AND date >= :start_date"
+            params["start_date"] = start_date
+        if end_date:
+            sql += " AND date <= :end_date"
+            params["end_date"] = end_date
+        sql += " ORDER BY date"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    def save_future_continuous(self, df: pd.DataFrame) -> bool:
+        """保存期货连续合约价格（展期后）
+
+        Args:
+            df: DataFrame with columns from calculate_static_rollover()
+        """
+        if df.empty:
+            return False
+        try:
+            df.to_sql("prices_future_continuous", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to prices_future_continuous")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save continuous prices: {e}")
+            return False
+
+    def get_future_continuous(
+        self,
+        underlying: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        roll_start_days: int = 10,
+        roll_end_days: int = 3,
+    ) -> pd.DataFrame:
+        """查询期货连续合约价格"""
+        sql = """
+            SELECT * FROM prices_future_continuous
+            WHERE underlying = :underlying
+            AND roll_start_days = :p AND roll_end_days = :q
+        """
+        params = {
+            "underlying": underlying,
+            "p": roll_start_days,
+            "q": roll_end_days
+        }
+        if start_date:
+            sql += " AND date >= :start_date"
+            params["start_date"] = start_date
+        if end_date:
+            sql += " AND date <= :end_date"
+            params["end_date"] = end_date
+        sql += " ORDER BY date"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    # ==================== 指数价格表操作 ====================
+
+    def save_index_prices(self, df: pd.DataFrame) -> bool:
+        """保存指数价格数据"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("prices_index", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to prices_index")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save index prices: {e}")
+            return False
+
+    def get_index_prices(
+        self,
+        symbol: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """查询指数价格"""
+        sql = "SELECT * FROM prices_index WHERE symbol = :symbol"
+        params = {"symbol": symbol}
+        if start_date:
+            sql += " AND date >= :start_date"
+            params["start_date"] = start_date
+        if end_date:
+            sql += " AND date <= :end_date"
+            params["end_date"] = end_date
+        sql += " ORDER BY date"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    # ==================== 统一价格查询接口 ====================
+
+    def get_daily_price(
+        self,
+        symbol: Union[str, List[str]],
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        asset_class: Optional[str] = None,
+        fields: Optional[List[str]] = None
+    ) -> pd.DataFrame:
+        """从数据库查询日频行情数据（统一接口）
+
+        根据 asset_class 自动选择对应的表查询
+        """
+        if isinstance(symbol, str):
+            symbol = [symbol]
+
+        results = []
+        for sym in symbol:
+            # 根据 symbol 判断资产类型
+            if asset_class is None:
+                if sym.startswith(('IF', 'IC', 'IM', 'IH', 'TF', 'T', 'TS', 'TL')) and len(sym) <= 6:
+                    asset_type = 'future_continuous'
+                elif '.' in sym:
+                    asset_type = 'stock'
+                else:
+                    asset_type = 'index'
+            else:
+                asset_type = asset_class
+
+            if asset_type == 'stock':
+                df = self.get_stock_prices(sym, start_date, end_date, fields)
+            elif asset_type == 'future_continuous':
+                underlying = sym if len(sym) <= 4 else sym[:2]
+                df = self.get_future_continuous(underlying, start_date, end_date)
+            elif asset_type == 'index':
+                df = self.get_index_prices(sym, start_date, end_date)
+            else:
+                # 默认尝试 stock 表
+                df = self.get_stock_prices(sym, start_date, end_date, fields)
+
+            if not df.empty:
+                df['symbol'] = sym
+                results.append(df)
+
+        if not results:
+            return pd.DataFrame()
+
+        return pd.concat(results, ignore_index=True)
+
+    def save_daily_price(self, df: pd.DataFrame, asset_class: str = 'stock') -> bool:
+        """保存日频行情数据（统一接口）
+
+        Args:
+            df: DataFrame with price data
+            asset_class: 'stock'/'future'/'future_continuous'/'index'
+        """
+        if df.empty:
+            logger.warning("Empty dataframe, nothing to save")
+            return False
+
+        if asset_class == 'stock':
+            return self.save_stock_prices(df)
+        elif asset_class == 'future':
+            return self.save_future_prices(df)
+        elif asset_class == 'future_continuous':
+            return self.save_future_continuous(df)
+        elif asset_class == 'index':
+            return self.save_index_prices(df)
+        else:
+            logger.error(f"Unknown asset_class: {asset_class}")
+            return False
             return pd.read_sql(text(sql), conn, params=params)
 
     def save_factor_data(self, df: pd.DataFrame, factor_name: str) -> bool:
@@ -138,27 +315,221 @@ class DatabaseManager:
         with self.engine.connect() as conn:
             return pd.read_sql(text(sql), conn, params=params)
 
-    def create_tables(self):
-        """创建基础表结构（如果不存在）"""
-        create_daily_price_sql = """
-        CREATE TABLE IF NOT EXISTS daily_price (
-            id SERIAL PRIMARY KEY,
-            symbol VARCHAR(20) NOT NULL,
-            date DATE NOT NULL,
-            open DECIMAL(12, 4),
-            high DECIMAL(12, 4),
-            low DECIMAL(12, 4),
-            close DECIMAL(12, 4),
-            volume BIGINT,
-            amount DECIMAL(20, 4),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(symbol, date)
-        );
-        CREATE INDEX IF NOT EXISTS idx_daily_price_symbol ON daily_price(symbol);
-        CREATE INDEX IF NOT EXISTS idx_daily_price_date ON daily_price(date);
-        """
+    # ==================== 策略管理表操作 ====================
+
+    def save_strategy_nav(self, df: pd.DataFrame) -> bool:
+        """保存策略净值数据"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("strategy_nav", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to strategy_nav")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save strategy NAV: {e}")
+            return False
+
+    def get_strategy_nav(
+        self,
+        strategy_code: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """查询策略净值"""
+        sql = "SELECT * FROM strategy_nav WHERE strategy_code = :code"
+        params = {"code": strategy_code}
+        if start_date:
+            sql += " AND date >= :start"
+            params["start"] = start_date
+        if end_date:
+            sql += " AND date <= :end"
+            params["end"] = end_date
+        sql += " ORDER BY date"
 
         with self.engine.connect() as conn:
-            conn.execute(text(create_daily_price_sql))
-            conn.commit()
-            logger.info("Database tables created/verified")
+            return pd.read_sql(text(sql), conn, params=params)
+
+    def save_target_positions(self, df: pd.DataFrame) -> bool:
+        """保存目标持仓（策略信号）"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("target_positions", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to target_positions")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save target positions: {e}")
+            return False
+
+    def get_target_positions(
+        self,
+        strategy_code: str,
+        date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """查询目标持仓"""
+        sql = "SELECT * FROM target_positions WHERE strategy_code = :code"
+        params = {"code": strategy_code}
+        if date:
+            sql += " AND date = :date"
+            params["date"] = date
+        sql += " ORDER BY date DESC, symbol"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    def save_actual_positions(self, df: pd.DataFrame) -> bool:
+        """保存实际持仓"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("actual_positions", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to actual_positions")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save actual positions: {e}")
+            return False
+
+    def get_actual_positions(
+        self,
+        strategy_code: str,
+        date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """查询实际持仓"""
+        sql = "SELECT * FROM actual_positions WHERE strategy_code = :code"
+        params = {"code": strategy_code}
+        if date:
+            sql += " AND date = :date"
+            params["date"] = date
+        sql += " ORDER BY date DESC, symbol"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    def save_trades(self, df: pd.DataFrame) -> bool:
+        """保存交易记录"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("trades", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to trades")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save trades: {e}")
+            return False
+
+    def get_trades(
+        self,
+        strategy_code: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """查询交易记录"""
+        sql = "SELECT * FROM trades WHERE strategy_code = :code"
+        params = {"code": strategy_code}
+        if start_date:
+            sql += " AND trade_date >= :start"
+            params["start"] = start_date
+        if end_date:
+            sql += " AND trade_date <= :end"
+            params["end"] = end_date
+        sql += " ORDER BY trade_date DESC, trade_time DESC"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    # ==================== 展期执行记录 ====================
+
+    def save_rollover_execution(self, df: pd.DataFrame) -> bool:
+        """保存期货展期执行记录"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("rollover_executions", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to rollover_executions")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save rollover executions: {e}")
+            return False
+
+    # ==================== 资产和基础数据 ====================
+
+    def save_assets(self, df: pd.DataFrame) -> bool:
+        """保存资产信息"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("assets", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to assets")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save assets: {e}")
+            return False
+
+    def get_assets(self, asset_class: Optional[str] = None) -> pd.DataFrame:
+        """查询资产列表"""
+        sql = "SELECT * FROM assets WHERE is_active = TRUE"
+        params = {}
+        if asset_class:
+            sql += " AND asset_class = :cls"
+            params["cls"] = asset_class
+        sql += " ORDER BY symbol"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    def save_trade_calendar(self, df: pd.DataFrame) -> bool:
+        """保存交易日历"""
+        if df.empty:
+            return False
+        try:
+            df.to_sql("trade_calendar", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to trade_calendar")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save trade calendar: {e}")
+            return False
+
+    def get_trade_calendar(
+        self,
+        market: str = "SSE",
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """查询交易日历"""
+        sql = "SELECT * FROM trade_calendar WHERE market = :market"
+        params = {"market": market}
+        if start_date:
+            sql += " AND date >= :start"
+            params["start"] = start_date
+        if end_date:
+            sql += " AND date <= :end"
+            params["end"] = end_date
+        sql += " ORDER BY date"
+
+        with self.engine.connect() as conn:
+            return pd.read_sql(text(sql), conn, params=params)
+
+    def create_tables(self):
+        """创建基础表结构（执行schema.sql）"""
+        schema_file = Path(__file__).parent.parent / "database" / "schema.sql"
+        if not schema_file.exists():
+            logger.warning(f"Schema file not found: {schema_file}")
+            return
+
+        with open(schema_file, 'r', encoding='utf-8') as f:
+            sql_content = f.read()
+
+        statements = [s.strip() for s in sql_content.split(';') if s.strip()]
+
+        with self.engine.connect() as conn:
+            with conn.begin():
+                for statement in statements:
+                    if not statement or statement.startswith('--'):
+                        continue
+                    try:
+                        conn.execute(text(statement + ';'))
+                    except Exception as e:
+                        if "already exists" not in str(e) and "duplicate" not in str(e).lower():
+                            logger.warning(f"Error: {e}")
+
+        logger.info("Database tables created/verified")
