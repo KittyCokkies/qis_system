@@ -10,7 +10,7 @@ version: "1.0"
 #   {underlying}_{type}{p}q{q}_{price}[_vol]
 #   type: S=Static, D=Dynamic
 #   price: settle/close
-#   _vol: suffix only for volume-driven dynamic rollover
+#   _vol: suffix only for volume-driven dynamic roll
 # ============================================================
 
 futures:
@@ -27,7 +27,7 @@ futures:
     configs:
       - config_name: 沪深300静态展期_结算价
         config_id: IF_S7q4_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 7
         roll_end_days: 4
@@ -48,7 +48,7 @@ futures:
     configs:
       - config_name: 中证500静态展期_结算价
         config_id: IC_S7q4_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 7
         roll_end_days: 4
@@ -69,7 +69,7 @@ futures:
     configs:
       - config_name: 中证1000静态展期_结算价
         config_id: IM_S7q4_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 7
         roll_end_days: 4
@@ -93,7 +93,7 @@ futures:
     configs:
       - config_name: 30年国债静态展期_结算价
         config_id: TL_S25q15_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 25
         roll_end_days: 15
@@ -115,7 +115,7 @@ futures:
     configs:
       - config_name: 10年国债静态展期_结算价
         config_id: T_S25q15_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 25
         roll_end_days: 15
@@ -137,7 +137,7 @@ futures:
     configs:
       - config_name: 5年国债静态展期_结算价
         config_id: TF_S25q15_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 25
         roll_end_days: 15
@@ -159,7 +159,7 @@ futures:
     configs:
       - config_name: 2年国债静态展期_结算价
         config_id: TS_S25q15_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 25
         roll_end_days: 15
@@ -184,7 +184,7 @@ futures:
     configs:
       - config_name: 螺纹钢静态展期_结算价
         config_id: RB_S80q30_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 80
         roll_end_days: 30
@@ -198,7 +198,7 @@ futures:
 
       - config_name: 螺纹钢静态展期_结算价_备选
         config_id: RB_S72q34_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 72
         roll_end_days: 34
@@ -212,7 +212,7 @@ futures:
 
       - config_name: 螺纹钢动态展期_收盘价
         config_id: RB_D72q34_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 72
         roll_end_days: 34
@@ -234,7 +234,7 @@ futures:
     configs:
       - config_name: 铁矿石静态展期_结算价
         config_id: I_S60q25_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 60
         roll_end_days: 25
@@ -248,7 +248,7 @@ futures:
 
       - config_name: 铁矿石动态展期_收盘价
         config_id: I_D71q28_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 71
         roll_end_days: 28
@@ -270,7 +270,7 @@ futures:
     configs:
       - config_name: 焦炭静态展期_结算价
         config_id: J_S65q25_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 65
         roll_end_days: 25
@@ -284,7 +284,7 @@ futures:
 
       - config_name: 焦炭动态展期_收盘价
         config_id: J_D62q18_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 62
         roll_end_days: 18
@@ -306,7 +306,7 @@ futures:
     configs:
       - config_name: 焦煤静态展期_结算价
         config_id: JM_S58q21_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 58
         roll_end_days: 21
@@ -320,7 +320,7 @@ futures:
 
       - config_name: 焦煤动态展期_收盘价
         config_id: JM_D58q21_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 58
         roll_end_days: 21
@@ -342,7 +342,7 @@ futures:
     configs:
       - config_name: 热卷静态展期_结算价
         config_id: HC_S53q23_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 53
         roll_end_days: 23
@@ -356,7 +356,7 @@ futures:
 
       - config_name: 热卷动态展期_收盘价
         config_id: HC_D53q23_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 53
         roll_end_days: 23
@@ -379,7 +379,7 @@ futures:
     configs:
       - config_name: 不锈钢动态展期_收盘价
         config_id: SS_D41q16_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 41
         roll_end_days: 16
@@ -401,7 +401,7 @@ futures:
     configs:
       - config_name: 锰硅动态展期_结算价
         config_id: SM_D96q17_settle
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: settle
         roll_start_days: 96
         roll_end_days: 17
@@ -423,7 +423,7 @@ futures:
     configs:
       - config_name: 硅铁动态展期_结算价
         config_id: SF_D96q14_settle
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: settle
         roll_start_days: 96
         roll_end_days: 14
@@ -448,7 +448,7 @@ futures:
     configs:
       - config_name: 玉米静态展期_结算价
         config_id: C_S120q30_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 120
         roll_end_days: 30
@@ -462,7 +462,7 @@ futures:
 
       - config_name: 玉米动态展期_收盘价
         config_id: C_D124q24_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 124
         roll_end_days: 24
@@ -484,7 +484,7 @@ futures:
     configs:
       - config_name: 豆粕静态展期_结算价
         config_id: M_S140q30_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 140
         roll_end_days: 30
@@ -498,7 +498,7 @@ futures:
 
       - config_name: 豆粕动态展期_收盘价
         config_id: M_D138q29_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 138
         roll_end_days: 29
@@ -520,7 +520,7 @@ futures:
     configs:
       - config_name: 豆油动态展期_收盘价
         config_id: Y_D135q26_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 135
         roll_end_days: 26
@@ -542,7 +542,7 @@ futures:
     configs:
       - config_name: 棕榈油动态展期_收盘价
         config_id: P_D129q23_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 129
         roll_end_days: 23
@@ -564,7 +564,7 @@ futures:
     configs:
       - config_name: 棉花静态展期_结算价
         config_id: CF_S116q30_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 116
         roll_end_days: 30
@@ -578,7 +578,7 @@ futures:
 
       - config_name: 棉花动态展期_收盘价
         config_id: CF_D116q27_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 116
         roll_end_days: 27
@@ -601,7 +601,7 @@ futures:
     configs:
       - config_name: 白糖动态展期_收盘价
         config_id: SR_D133q24_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 133
         roll_end_days: 24
@@ -623,7 +623,7 @@ futures:
     configs:
       - config_name: 菜粕静态展期_结算价
         config_id: RM_S60q25_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 60
         roll_end_days: 25
@@ -637,7 +637,7 @@ futures:
 
       - config_name: 菜粕动态展期_收盘价
         config_id: RM_D90q15_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 90
         roll_end_days: 15
@@ -662,7 +662,7 @@ futures:
     configs:
       - config_name: PTA静态展期_结算价
         config_id: TA_S60q25_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 60
         roll_end_days: 25
@@ -676,7 +676,7 @@ futures:
 
       - config_name: PTA动态展期_收盘价
         config_id: TA_D56q28_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 56
         roll_end_days: 28
@@ -698,7 +698,7 @@ futures:
     configs:
       - config_name: 甲醇静态展期_结算价
         config_id: MA_S50q20_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 50
         roll_end_days: 20
@@ -712,7 +712,7 @@ futures:
 
       - config_name: 甲醇动态展期_收盘价
         config_id: MA_D50q20_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 50
         roll_end_days: 20
@@ -734,7 +734,7 @@ futures:
     configs:
       - config_name: PP静态展期_结算价
         config_id: PP_S40q20_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 40
         roll_end_days: 20
@@ -748,7 +748,7 @@ futures:
 
       - config_name: PP动态展期_收盘价
         config_id: PP_D51q19_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 51
         roll_end_days: 19
@@ -770,7 +770,7 @@ futures:
     configs:
       - config_name: 原油静态展期_结算价
         config_id: SC_S60q35_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 60
         roll_end_days: 35
@@ -783,7 +783,7 @@ futures:
 
       - config_name: 原油动态展期_收盘价
         config_id: SC_D31q9_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 31
         roll_end_days: 9
@@ -806,7 +806,7 @@ futures:
     configs:
       - config_name: 橡胶静态展期_结算价
         config_id: RU_S96q30_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 96
         roll_end_days: 30
@@ -820,7 +820,7 @@ futures:
 
       - config_name: 橡胶动态展期_收盘价
         config_id: RU_D96q27_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 96
         roll_end_days: 27
@@ -845,7 +845,7 @@ futures:
     configs:
       - config_name: 沪铜静态展期_结算价
         config_id: CU_S73q13_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 73
         roll_end_days: 13
@@ -858,7 +858,7 @@ futures:
 
       - config_name: 沪铜静态展期_结算价_备选
         config_id: CU_S45q35_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 45
         roll_end_days: 35
@@ -871,7 +871,7 @@ futures:
 
       - config_name: 沪铜动态展期_收盘价
         config_id: CU_D73q13_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 73
         roll_end_days: 13
@@ -885,7 +885,7 @@ futures:
 
       - config_name: 沪铜动态展期_收盘价_成交量
         config_id: CU_D73q13_close_vol
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 73
         roll_end_days: 13
@@ -907,7 +907,7 @@ futures:
     configs:
       - config_name: 沪铝静态展期_结算价
         config_id: AL_S66q15_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 66
         roll_end_days: 15
@@ -920,7 +920,7 @@ futures:
 
       - config_name: 沪铝动态展期_收盘价
         config_id: AL_D66q15_close
-        rollover_type: dynamic
+        roll_type: dynamic
         price_type: close
         roll_start_days: 66
         roll_end_days: 15
@@ -943,7 +943,7 @@ futures:
     configs:
       - config_name: 沪金静态展期_结算价
         config_id: AU_S35q20_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 35
         roll_end_days: 20
@@ -957,7 +957,7 @@ futures:
 
       - config_name: 沪金静态展期_收盘价
         config_id: AU_S35q20_close
-        rollover_type: static
+        roll_type: static
         price_type: close
         roll_start_days: 35
         roll_end_days: 20
@@ -979,7 +979,7 @@ futures:
     configs:
       - config_name: 沪银静态展期_结算价
         config_id: AG_S35q20_settle
-        rollover_type: static
+        roll_type: static
         price_type: settle
         roll_start_days: 35
         roll_end_days: 20

@@ -11,7 +11,7 @@ from datetime import date
 
 from data.config.models import (
     Exchange,
-    RolloverConfig,
+    RollConfig,
     FutureAsset,
     IndexAsset,
     ETFAsset,
@@ -116,7 +116,7 @@ class AssetConfigLoader:
         self.ensure_loaded()
         return [f for f in self.futures.values() if f.exchange == exchange]
 
-    def get_rollover_config(self, config_id: str) -> Optional[RolloverConfig]:
+    def get_roll_config(self, config_id: str) -> Optional[RollConfig]:
         """
         获取展期配置
 
@@ -124,7 +124,7 @@ class AssetConfigLoader:
             config_id: 配置ID，如 "IF_S7q4_settle"
 
         Returns:
-            RolloverConfig or None
+            RollConfig or None
         """
         self.ensure_loaded()
         # 从config_id解析underlying
@@ -134,12 +134,12 @@ class AssetConfigLoader:
             return future.get_config(config_id)
         return None
 
-    def get_all_rollover_configs(self) -> List[Tuple[str, RolloverConfig]]:
+    def get_all_roll_configs(self) -> List[Tuple[str, RollConfig]]:
         """
         获取所有展期配置
 
         Returns:
-            List of (underlying, RolloverConfig) tuples
+            List of (underlying, RollConfig) tuples
         """
         self.ensure_loaded()
         configs = []
@@ -148,15 +148,15 @@ class AssetConfigLoader:
                 configs.append((underlying, cfg))
         return configs
 
-    def get_active_rollover_configs(self) -> List[Tuple[str, RolloverConfig]]:
+    def get_active_roll_configs(self) -> List[Tuple[str, RollConfig]]:
         """
         获取所有启用的展期配置
 
         Returns:
-            List of (underlying, RolloverConfig) tuples
+            List of (underlying, RollConfig) tuples
         """
         self.ensure_loaded()
-        return [(u, c) for u, c in self.get_all_rollover_configs() if c.update_flag == 1]
+        return [(u, c) for u, c in self.get_all_roll_configs() if c.update_flag == 1]
 
     # -------------------- Indices --------------------
 
@@ -248,8 +248,8 @@ class AssetConfigLoader:
         """
         self.ensure_loaded()
 
-        total_rollover_configs = sum(len(f.configs) for f in self.futures.values())
-        active_rollover_configs = sum(
+        total_roll_configs = sum(len(f.configs) for f in self.futures.values())
+        active_roll_configs = sum(
             len([c for c in f.configs if c.update_flag == 1])
             for f in self.futures.values()
         )
@@ -273,8 +273,8 @@ class AssetConfigLoader:
             "indices_count": len(self.indices),
             "etfs_count": len(self.etfs),
             "concat_assets_count": len(self.concat_assets),
-            "total_rollover_configs": total_rollover_configs,
-            "active_rollover_configs": active_rollover_configs,
+            "total_roll_configs": total_roll_configs,
+            "active_roll_configs": active_roll_configs,
             "futures_by_exchange": futures_by_exchange,
             "indices_by_source": indices_by_source,
         }
@@ -287,8 +287,8 @@ class AssetConfigLoader:
         print("Asset Configuration Statistics")
         print("=" * 60)
         print(f"Futures: {stats['futures_count']}")
-        print(f"  - Total rollover configs: {stats['total_rollover_configs']}")
-        print(f"  - Active rollover configs: {stats['active_rollover_configs']}")
+        print(f"  - Total roll configs: {stats['total_roll_configs']}")
+        print(f"  - Active roll configs: {stats['active_roll_configs']}")
         print(f"\nFutures by Exchange:")
         for ex, count in sorted(stats['futures_by_exchange'].items()):
             print(f"  - {ex}: {count}")

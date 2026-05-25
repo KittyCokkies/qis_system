@@ -9,12 +9,12 @@ from data.ftp_source import FTPSource
 from data.dolphindb_source import DolphinDBSource
 from data.cache import DataCache
 from data.data_manager import DataManager
-from data.future_rollover import (
-    FutureRolloverAnalyzer,
-    RolloverStrategyAdapter,
-    RolloverConfig,
-    RolloverPriceType,
-    RolloverSignalType,
+from data.future_roll import (
+    FutureRollAnalyzer,
+    RollStrategyAdapter,
+    RollConfig,
+    RollPriceType,
+    RollSignalType,
 )
 
 __all__ = [
@@ -29,9 +29,9 @@ __all__ = [
     "DolphinDBSource",
     "DataCache",
     "DataManager",
-    "FutureRolloverAnalyzer",
-    "RolloverStrategyAdapter",
-    "RolloverConfig",
-    "RolloverPriceType",
-    "RolloverSignalType",
+    "FutureRollAnalyzer",
+    "RollStrategyAdapter",
+    "RollConfig",
+    "RollPriceType",
+    "RollSignalType",
 ]

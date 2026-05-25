@@ -10,7 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from data.tonglian_source import TonglianSource
-from data.config.loader import AssetConfigLoader, RolloverConfig
+from data.config.loader import AssetConfigLoader, RollConfig
 from data.database import DatabaseManager
 
 
@@ -41,11 +41,11 @@ class TonglianSync:
             self._connected = False
             logger.info("Disconnected from Tonglian")
 
-    def get_active_configs(self) -> List[Tuple[str, RolloverConfig]]:
-        """Get all active rollover configurations"""
-        return self.config_loader.get_active_rollover_configs()
+    def get_active_configs(self) -> List[Tuple[str, RollConfig]]:
+        """Get all active roll configurations"""
+        return self.config_loader.get_active_roll_configs()
 
-    def get_configs_for_underlying(self, underlying: str) -> List[Tuple[str, RolloverConfig]]:
+    def get_configs_for_underlying(self, underlying: str) -> List[Tuple[str, RollConfig]]:
         """Get configs for specific underlying"""
         future = self.config_loader.get_future(underlying)
         if future:

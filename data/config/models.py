@@ -31,7 +31,7 @@ class Exchange(Enum):
     IPE = "IPE"        # 洲际交易所
 
 
-class RolloverType(Enum):
+class RollType(Enum):
     """展期类型"""
     STATIC = "static"
     DYNAMIC = "dynamic"
@@ -65,7 +65,7 @@ class RolloverConfig:
     """展期配置"""
     config_id: str                    # 配置唯一ID，如 "IF_S7q4_settle"
     config_name: str                  # 配置名称
-    rollover_type: RolloverType      # static / dynamic
+    roll_type: RollType          # static / dynamic
     price_type: PriceType            # settle / close
     roll_start_days: int             # p: 到期前p天开始观察
     roll_end_days: int               # q: 到期前q天强制展期
@@ -80,8 +80,8 @@ class RolloverConfig:
 
     def __post_init__(self):
         """初始化后处理"""
-        if isinstance(self.rollover_type, str):
-            self.rollover_type = RolloverType(self.rollover_type)
+        if isinstance(self.roll_type, str):
+            self.roll_type = RollType(self.roll_type)
         if isinstance(self.price_type, str):
             self.price_type = PriceType(self.price_type)
         if isinstance(self.condition_type, str):
@@ -98,7 +98,7 @@ class RolloverConfig:
     def is_open_interest_driven(self) -> bool:
         """是否持仓量驱动"""
         return self.condition_type == ConditionType.OPEN_INTEREST or \
-               (self.rollover_type == RolloverType.DYNAMIC and self.condition_type is None)
+               (self.roll_type == RollType.DYNAMIC and self.condition_type is None)
 
 
 @dataclass
@@ -322,7 +322,7 @@ def parse_config_id(config_id: str) -> Dict[str, Any]:
 
     return {
         "underlying": match.group(1),
-        "rollover_type": RolloverType.STATIC if match.group(2) == "S" else RolloverType.DYNAMIC,
+        "roll_type": RollType.STATIC if match.group(2) == "S" else RollType.DYNAMIC,
         "roll_start_days": int(match.group(3)),
         "roll_end_days": int(match.group(4)),
         "price_type": PriceType(match.group(5)),
@@ -332,7 +332,7 @@ def parse_config_id(config_id: str) -> Dict[str, Any]:
 
 def build_config_id(
     underlying: str,
-    rollover_type: RolloverType,
+    roll_type: RollType,
     roll_start: int,
     roll_end: int,
     price_type: PriceType,
@@ -343,7 +343,7 @@ def build_config_id(
 
     Args:
         underlying: 品种代码
-        rollover_type: 展期类型
+        roll_type: 展期类型
         roll_start: 开始观察天数
         roll_end: 强制展期天数
         price_type: 价格类型
@@ -352,10 +352,10 @@ def build_config_id(
     Returns:
         配置ID字符串
     """
-    type_code = "S" if rollover_type == RolloverType.STATIC else "D"
+    type_code = "S" if roll_type == RollType.STATIC else "D"
     base = f"{underlying}_{type_code}{roll_start}q{roll_end}_{price_type.value}"
 
-    if rollover_type == RolloverType.DYNAMIC and condition_type == ConditionType.VOLUME:
+    if roll_type == RollType.DYNAMIC and condition_type == ConditionType.VOLUME:
         base += "_vol"
 
     return base

@@ -108,10 +108,10 @@ CREATE TABLE IF NOT EXISTS prices_future_continuous (
     next_price DECIMAL(12, 4),                    -- 下月合约价格
     continuous_price DECIMAL(12, 4),              -- 连续合约价格（跳空调整）
     price_diff DECIMAL(12, 4),                    -- 远近月价差
-    rollover_return DECIMAL(10, 6),               -- 展期收益
+    roll_return DECIMAL(10, 6),                   -- 展期收益
     days_to_expiry INTEGER,                       -- 距离到期天数
-    is_rollover_day BOOLEAN DEFAULT FALSE,        -- 是否换仓日
-    rollover_type VARCHAR(20),                    -- 换仓类型：hold/observation_roll/forced_roll
+    is_roll_day BOOLEAN DEFAULT FALSE,            -- 是否换仓日
+    roll_type VARCHAR(20),                        -- 换仓类型：hold/observation_roll/forced_roll
     roll_start_days INTEGER DEFAULT 10,           -- 观察窗口p
     roll_end_days INTEGER DEFAULT 3,              -- 强制窗口q
     open_interest BIGINT,                         -- 持仓量
@@ -360,7 +360,7 @@ CREATE INDEX idx_trades_symbol ON trades(symbol, trade_date DESC);
 -- --------------------------------------------------------
 
 -- 展期执行记录表
-CREATE TABLE IF NOT EXISTS rollover_executions (
+CREATE TABLE IF NOT EXISTS roll_executions (
     id BIGSERIAL PRIMARY KEY,
     strategy_code VARCHAR(30) NOT NULL,           -- 策略代码
     underlying VARCHAR(10) NOT NULL,              -- 品种代码
@@ -566,7 +566,7 @@ COMMENT ON TABLE strategy_nav IS '策略净值表：策略每日净值、收益�
 COMMENT ON TABLE target_positions IS '目标持仓表：策略生成的目标权重和交易信号';
 COMMENT ON TABLE actual_positions IS '实际持仓表：实际执行的持仓和盈亏情况';
 COMMENT ON TABLE trades IS '交易记录表：成交明细（价格、数量、成本、滑点）';
-COMMENT ON TABLE rollover_executions IS '展期执行记录表：期货合约换月执行记录及成本';
+COMMENT ON TABLE roll_executions IS '展期执行记录表：期货合约换月执行记录及成本';
 
 COMMENT ON TABLE index_components IS '指数成分股表：指数成分及其权重变化';
 COMMENT ON TABLE industry_classification IS '行业分类表：股票的行业分类（一级/二级/三级）';

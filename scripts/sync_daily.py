@@ -67,9 +67,9 @@ def sync_tonglian(sync_date: date, full_refresh: bool = False):
         # Connect to source
         sync.connect()
 
-        # Get active rollover configs
+        # Get active roll configs
         configs = sync.get_active_configs()
-        logger.info(f"Found {len(configs)} active rollover configs")
+        logger.info(f"Found {len(configs)} active roll configs")
 
         # Sync each underlying
         for underlying, cfg in configs:

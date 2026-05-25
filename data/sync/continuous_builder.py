@@ -2,7 +2,7 @@
 Continuous Contract Builder
 
 Builds continuous price series from individual futures contracts
-based on rollover configurations.
+based on roll configurations.
 """
 
 from datetime import date, timedelta
@@ -10,9 +10,9 @@ from typing import Optional, List
 from loguru import logger
 
 from data.config.loader import AssetConfigLoader
-from data.config.models import RolloverConfig, RolloverType, PriceType
+from data.config.models import RollConfig, RolloverType, PriceType
 from data.database import DatabaseManager
-from data.future_rollover import FutureRolloverAnalyzer
+from data.future_roll import FutureRollAnalyzer
 
 
 class ContinuousContractBuilder:
@@ -21,7 +21,7 @@ class ContinuousContractBuilder:
     def __init__(self):
         self.db = DatabaseManager()
         self.config_loader = AssetConfigLoader()
-        self.rollover_analyzer = FutureRolloverAnalyzer()
+        self.roll_analyzer = FutureRolloverAnalyzer()
 
     def build_for_date(self, config_id: str, build_date: date) -> int:
         """
@@ -35,7 +35,7 @@ class ContinuousContractBuilder:
             Number of records created (0 or 1)
         """
         # Get config
-        config = self.config_loader.get_rollover_config(config_id)
+        config = self.config_loader.get_roll_config(config_id)
         if not config:
             raise ValueError(f"Unknown config_id: {config_id}")
 
@@ -49,7 +49,7 @@ class ContinuousContractBuilder:
             logger.debug(f"No contracts found for {underlying} on {build_date}")
             return 0
 
-        # Determine current and next contracts based on rollover rules
+        # Determine current and next contracts based on roll rules
         current_contract, next_contract, days_to_expiry = self._determine_contracts(
             underlying, contracts, build_date, config
         )
@@ -64,28 +64,28 @@ class ContinuousContractBuilder:
         if next_contract:
             next_price = self._get_contract_price(next_contract, build_date, config.price_type)
 
-        # Calculate continuous price and rollover info
+        # Calculate continuous price and roll info
         continuous_price = current_price
         price_diff = None
-        rollover_return = None
-        is_rollover_day = False
-        rollover_type = 'hold'
+        roll_return = None
+        is_roll_day = False
+        roll_type = 'hold'
 
         if next_contract and next_price:
             price_diff = next_price - current_price if next_price and current_price else None
 
-            # Check if rollover should occur
+            # Check if roll should occur
             if days_to_expiry is not None:
                 if days_to_expiry <= config.roll_end_days:
-                    # Forced rollover
-                    is_rollover_day = True
-                    rollover_type = 'forced_roll'
+                    # Forced roll
+                    is_roll_day = True
+                    roll_type = 'forced_roll'
                 elif days_to_expiry <= config.roll_start_days:
                     # Observation window - check dynamic conditions if applicable
-                    if config.rollover_type == RolloverType.DYNAMIC:
-                        if self._should_rollover_dynamic(underlying, current_contract, next_contract, build_date, config):
-                            is_rollover_day = True
-                            rollover_type = 'observation_roll'
+                    if config.roll_type == RolloverType.DYNAMIC:
+                        if self._should_roll_dynamic(underlying, current_contract, next_contract, build_date, config):
+                            is_roll_day = True
+                            roll_type = 'observation_roll'
 
         # Insert continuous price record
         self.db.execute("""
@@ -93,8 +93,8 @@ class ContinuousContractBuilder:
                 config_id, underlying, date,
                 current_contract, next_contract,
                 current_price, next_price, continuous_price,
-                price_diff, rollover_return, days_to_expiry,
-                is_rollover_day, rollover_type
+                price_diff, roll_return, days_to_expiry,
+                is_roll_day, roll_type
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (config_id, date) DO UPDATE SET
                 current_contract = EXCLUDED.current_contract,
@@ -103,16 +103,16 @@ class ContinuousContractBuilder:
                 next_price = EXCLUDED.next_price,
                 continuous_price = EXCLUDED.continuous_price,
                 price_diff = EXCLUDED.price_diff,
-                rollover_return = EXCLUDED.rollover_return,
+                roll_return = EXCLUDED.roll_return,
                 days_to_expiry = EXCLUDED.days_to_expiry,
-                is_rollover_day = EXCLUDED.is_rollover_day,
-                rollover_type = EXCLUDED.rollover_type
+                is_roll_day = EXCLUDED.is_roll_day,
+                roll_type = EXCLUDED.roll_type
         """, (
             config_id, underlying, build_date,
             current_contract, next_contract,
             current_price, next_price, continuous_price,
-            price_diff, rollover_return, days_to_expiry,
-            is_rollover_day, rollover_type
+            price_diff, roll_return, days_to_expiry,
+            is_roll_day, roll_type
         ))
 
         logger.debug(f"Built continuous price for {config_id} on {build_date}: {continuous_price}")
@@ -170,7 +170,7 @@ class ContinuousContractBuilder:
         underlying: str,
         contracts: List[str],
         query_date: date,
-        config: RolloverConfig
+        config: RollConfig
     ) -> tuple:
         """
         Determine current and next contracts
@@ -222,19 +222,19 @@ class ContinuousContractBuilder:
 
         return current, next_contract, days_to_expiry
 
-    def _should_rollover_dynamic(
+    def _should_roll_dynamic(
         self,
         underlying: str,
         current_contract: str,
         next_contract: str,
         query_date: date,
-        config: RolloverConfig
+        config: RollConfig
     ) -> bool:
         """
-        Check if should rollover based on dynamic conditions
+        Check if should roll based on dynamic conditions
 
-        For OI-driven: rollover when next contract OI > current contract OI * threshold
-        For volume-driven: rollover when next contract volume > current contract volume * threshold
+        For OI-driven: roll when next contract OI > current contract OI * threshold
+        For volume-driven: roll when next contract volume > current contract volume * threshold
         """
         # Get OI or volume for both contracts
         metric = 'open_interest' if config.condition_type != 'volume' else 'volume'

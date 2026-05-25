@@ -18,7 +18,7 @@ class DBRolloverConfig:
     """Rollover config from database"""
     config_id: str
     underlying: str
-    rollover_type: RolloverType
+    roll_type: RolloverType
     price_type: PriceType
     roll_start_days: int
     roll_end_days: int
@@ -33,9 +33,9 @@ class SyncConfigLoader:
     def __init__(self):
         self.db = DatabaseManager()
 
-    def get_active_rollover_configs(self, data_source: Optional[str] = None) -> List[DBRolloverConfig]:
+    def get_active_roll_configs(self, data_source: Optional[str] = None) -> List[DBRolloverConfig]:
         """
-        Get active rollover configurations from database
+        Get active roll configurations from database
 
         Args:
             data_source: Filter by data source (optional)
@@ -44,10 +44,10 @@ class SyncConfigLoader:
             List of DBRolloverConfig
         """
         sql = """
-            SELECT config_id, underlying, rollover_type, price_type,
+            SELECT config_id, underlying, roll_type, price_type,
                    roll_start_days, roll_end_days, threshold,
                    condition_type, transaction_cost
-            FROM rollover_configs
+            FROM roll_configs
             WHERE is_active = TRUE AND update_flag = 1
         """
         params = []
@@ -65,7 +65,7 @@ class SyncConfigLoader:
             configs.append(DBRolloverConfig(
                 config_id=row[0],
                 underlying=row[1],
-                rollover_type=RolloverType(row[2]),
+                roll_type=RolloverType(row[2]),
                 price_type=PriceType(row[3]),
                 roll_start_days=row[4],
                 roll_end_days=row[5],
@@ -77,12 +77,12 @@ class SyncConfigLoader:
         return configs
 
     def get_config(self, config_id: str) -> Optional[DBRolloverConfig]:
-        """Get a specific rollover config"""
+        """Get a specific roll config"""
         result = self.db.execute("""
-            SELECT config_id, underlying, rollover_type, price_type,
+            SELECT config_id, underlying, roll_type, price_type,
                    roll_start_days, roll_end_days, threshold,
                    condition_type, transaction_cost
-            FROM rollover_configs
+            FROM roll_configs
             WHERE config_id = %s
         """, (config_id,))
 
@@ -93,7 +93,7 @@ class SyncConfigLoader:
         return DBRolloverConfig(
             config_id=row[0],
             underlying=row[1],
-            rollover_type=RolloverType(row[2]),
+            roll_type=RolloverType(row[2]),
             price_type=PriceType(row[3]),
             roll_start_days=row[4],
             roll_end_days=row[5],

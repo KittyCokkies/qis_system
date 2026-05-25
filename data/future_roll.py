@@ -18,14 +18,14 @@ from loguru import logger
 from data.tonglian_source import TonglianSource
 
 
-class RolloverPriceType(str, Enum):
+class RollPriceType(str, Enum):
     """展期结算价格类型"""
     CLOSE = "close"           # 收盘价结算
     SETTLEMENT = "settlement" # 结算价结算
     VWAP = "vwap"             # 成交量加权均价（如有）
 
 
-class RolloverSignalType(str, Enum):
+class RollSignalType(str, Enum):
     """换仓信号指标类型"""
     OPEN_INTEREST = "open_interest"   # 持仓量最大
     VOLUME = "volume"                 # 成交量最大
@@ -35,10 +35,10 @@ class RolloverSignalType(str, Enum):
 
 
 @dataclass
-class RolloverConfig:
+class RollConfig:
     """展期配置"""
-    price_type: RolloverPriceType = RolloverPriceType.CLOSE
-    signal_type: RolloverSignalType = RolloverSignalType.OPEN_INTEREST
+    price_type: RollPriceType = RollPriceType.CLOSE
+    signal_type: RollSignalType = RollSignalType.OPEN_INTEREST
     days_before_expiry: int = 5       # 到期前N天开始考虑换仓
     min_roll_days: int = 3            # 最小展期天数（避免到期日换仓）
     weights: Dict[str, float] = None  # 综合评分权重（如使用COMBINED）
@@ -48,7 +48,7 @@ class RolloverConfig:
             self.weights = {"open_interest": 0.6, "volume": 0.4}
 
 
-class FutureRolloverAnalyzer:
+class FutureRollAnalyzer:
     """期货展期收益分析器
 
     基于通联数据库，支持:
@@ -59,7 +59,7 @@ class FutureRolloverAnalyzer:
     Example:
         >>> analyzer = FutureRolloverAnalyzer()
         >>> # 计算单品种展期收益
-        >>> df = analyzer.calculate_rollover_return("IF", "2024-01-01", "2024-12-31")
+        >>> df = analyzer.calculate_roll_return("IF", "2024-01-01", "2024-12-31")
         >>> # 批量计算所有股指期货
         >>> all_returns = analyzer.batch_calculate(["IF", "IC", "IM", "IH"])
     """
@@ -87,7 +87,7 @@ class FutureRolloverAnalyzer:
             source: TonglianSource实例，None则自动创建
         """
         self.source = source or TonglianSource()
-        self.config = RolloverConfig()
+        self.config = RollConfig()
         logger.info("FutureRolloverAnalyzer initialized")
 
     def get_future_contracts(
@@ -311,7 +311,7 @@ class FutureRolloverAnalyzer:
 
         return pd.concat(result, ignore_index=True)
 
-    def calculate_rollover_return(
+    def calculate_roll_return(
         self,
         underlying: str,
         start_date: Optional[Union[str, datetime]] = None,
@@ -341,7 +341,7 @@ class FutureRolloverAnalyzer:
             - next_contract: 次主力合约代码
             - main_price: 主力合约价格
             - next_price: 次主力合约价格
-            - rollover_return: 展期收益（年化）
+            - roll_return: 展期收益（年化）
             - days_to_roll: 距离换仓天数
             - signal: 换仓信号（是否到了换仓时点）
         """
@@ -393,17 +393,17 @@ class FutureRolloverAnalyzer:
                 continue
 
             # 展期收益 = (远月 - 近月) / 近月
-            rollover_return = (next_price - main_price) / main_price
+            roll_return = (next_price - main_price) / main_price
 
             # 年化（假设一年12个月合约）
             days_to_expiry = main['days_to_expiry']
             if days_to_expiry > 0:
-                annualized_return = rollover_return * (365 / days_to_expiry)
+                annualized_return = roll_return * (365 / days_to_expiry)
             else:
-                annualized_return = rollover_return * 12  # 近似年化
+                annualized_return = roll_return * 12  # 近似年化
 
             # 换仓信号
-            signal = self._check_rollover_signal(main, next_contract)
+            signal = self._check_roll_signal(main, next_contract)
 
             results.append({
                 'date': date,
@@ -413,12 +413,12 @@ class FutureRolloverAnalyzer:
                 'main_price': main_price,
                 'next_price': next_price,
                 'price_diff': next_price - main_price,
-                'rollover_return': rollover_return,
+                'roll_return': roll_return,
                 'annualized_return': annualized_return,
                 'days_to_expiry': days_to_expiry,
                 'main_open_interest': main['open_interest'],
                 'next_open_interest': next_contract['open_interest'],
-                'rollover_signal': signal,
+                'roll_signal': signal,
             })
 
         if not results:
@@ -428,10 +428,10 @@ class FutureRolloverAnalyzer:
         result_df['date'] = pd.to_datetime(result_df['date'])
         result_df = result_df.sort_values('date').reset_index(drop=True)
 
-        logger.info(f"Calculated {len(result_df)} days of rollover returns for {underlying}")
+        logger.info(f"Calculated {len(result_df)} days of roll returns for {underlying}")
         return result_df
 
-    def _check_rollover_signal(
+    def _check_roll_signal(
         self,
         main_contract: pd.Series,
         next_contract: pd.Series
@@ -439,7 +439,7 @@ class FutureRolloverAnalyzer:
         """检查是否触发换仓信号
 
         Returns:
-            'rollover': 应该换仓
+            'roll': 应该换仓
             'watch': 接近换仓时点
             'hold': 继续持有
         """
@@ -447,13 +447,13 @@ class FutureRolloverAnalyzer:
 
         # 到期前N天必须换仓
         if days_to_expiry <= self.config.min_roll_days:
-            return 'rollover'
+            return 'roll'
 
         # 到期前缓冲期开始关注
         if days_to_expiry <= self.config.days_before_expiry:
             # 检查次主力流动性是否更好
             if next_contract['open_interest'] > main_contract['open_interest'] * 0.8:
-                return 'rollover'
+                return 'roll'
             return 'watch'
 
         return 'hold'
@@ -469,7 +469,7 @@ class FutureRolloverAnalyzer:
 
         Args:
             underlyings: 品种代码列表，如 ["IF", "IC", "AU"]
-            **kwargs: 传递给 calculate_rollover_return 的参数
+            **kwargs: 传递给 calculate_roll_return 的参数
 
         Returns:
             {underlying: DataFrame} 字典
@@ -477,8 +477,8 @@ class FutureRolloverAnalyzer:
         results = {}
         for underlying in underlyings:
             try:
-                logger.info(f"Calculating rollover return for {underlying}...")
-                df = self.calculate_rollover_return(underlying, start_date, end_date, **kwargs)
+                logger.info(f"Calculating roll return for {underlying}...")
+                df = self.calculate_roll_return(underlying, start_date, end_date, **kwargs)
                 if not df.empty:
                     results[underlying] = df
                 else:
@@ -533,7 +533,7 @@ class FutureRolloverAnalyzer:
 
         return pd.concat(all_data, ignore_index=True)
 
-    def calculate_static_rollover(
+    def calculate_static_roll(
         self,
         underlying: str,
         start_date: Optional[Union[str, datetime]] = None,
@@ -634,8 +634,8 @@ class FutureRolloverAnalyzer:
             if days_to_first > roll_start_days:
                 # 到期日 > p: 继续持有当月合约（不换仓期）
                 current_row = first_contract
-                is_rollover = False
-                rollover_type = 'hold'
+                is_roll = False
+                roll_type = 'hold'
             elif roll_end_days < days_to_first <= roll_start_days:
                 # q < 到期日 <= p: 观察窗口期
                 # 此版本固定换仓：进入观察窗口即换仓
@@ -644,24 +644,24 @@ class FutureRolloverAnalyzer:
                 if len(current_candidates) > 1:
                     # 换到次月合约
                     current_row = current_candidates.iloc[1]
-                    is_rollover = True
-                    rollover_type = 'observation_roll'
+                    is_roll = True
+                    roll_type = 'observation_roll'
                 else:
                     current_row = first_contract
-                    is_rollover = False
-                    rollover_type = 'hold'
+                    is_roll = False
+                    roll_type = 'hold'
             else:
                 # 到期日 <= q: 强制换仓期
                 if len(tradable) > 1:
                     # 强制换到下月合约
                     current_row = tradable.iloc[1]
-                    is_rollover = True
-                    rollover_type = 'forced_roll'
+                    is_roll = True
+                    roll_type = 'forced_roll'
                 else:
                     # 没有下月合约，只能继续持有
                     current_row = first_contract
-                    is_rollover = False
-                    rollover_type = 'hold_last'
+                    is_roll = False
+                    roll_type = 'hold_last'
 
             # 查找下月合约（用于计算展期收益）
             next_candidates = tradable[tradable['last_trade_date'] > current_row['last_trade_date']]
@@ -675,10 +675,10 @@ class FutureRolloverAnalyzer:
 
             if not pd.isna(next_price) and current_price != 0:
                 price_diff = next_price - current_price
-                rollover_return = price_diff / current_price
+                roll_return = price_diff / current_price
             else:
                 price_diff = np.nan
-                rollover_return = np.nan
+                roll_return = np.nan
 
             results.append({
                 'date': date,
@@ -688,10 +688,10 @@ class FutureRolloverAnalyzer:
                 'current_price': current_price,
                 'next_price': next_price,
                 'price_diff': price_diff,
-                'rollover_return': rollover_return,
+                'roll_return': roll_return,
                 'days_to_expiry': current_row['days_to_expiry'],
-                'is_rollover_day': is_rollover,
-                'rollover_type': rollover_type,
+                'is_roll_day': is_roll,
+                'roll_type': roll_type,
                 'volume': current_row.get('volume'),
                 'open_interest': current_row.get('open_interest'),
             })
@@ -718,10 +718,10 @@ class FutureRolloverAnalyzer:
 
         cumulative_factor = 1.0
         for i in range(len(df) - 1, -1, -1):
-            if i < len(df) - 1 and df.iloc[i + 1]['is_rollover_day']:
-                rollover_return = df.iloc[i + 1]['rollover_return']
-                if not pd.isna(rollover_return):
-                    cumulative_factor *= (1 + rollover_return)
+            if i < len(df) - 1 and df.iloc[i + 1]['is_roll_day']:
+                roll_return = df.iloc[i + 1]['roll_return']
+                if not pd.isna(roll_return):
+                    cumulative_factor *= (1 + roll_return)
             df.loc[df.index[i], 'continuous_price'] = df.iloc[i]['current_price'] * cumulative_factor
 
         return df
@@ -762,17 +762,17 @@ class RolloverStrategyAdapter:
         results = []
         for underlying in underlyings:
             try:
-                df = self.analyzer.calculate_rollover_return(
+                df = self.analyzer.calculate_roll_return(
                     underlying, start_date, end_date, **kwargs
                 )
                 if df.empty:
                     continue
 
                 latest = df.iloc[-1].copy()
-                latest['roll_yield_ma'] = df['rollover_return'].rolling(lookback_days).mean().iloc[-1]
-                latest['roll_yield_std'] = df['rollover_return'].rolling(lookback_days).std().iloc[-1]
+                latest['roll_yield_ma'] = df['roll_return'].rolling(lookback_days).mean().iloc[-1]
+                latest['roll_yield_std'] = df['roll_return'].rolling(lookback_days).std().iloc[-1]
                 latest['roll_yield_zscore'] = (
-                    (latest['rollover_return'] - latest['roll_yield_ma']) / latest['roll_yield_std']
+                    (latest['roll_return'] - latest['roll_yield_ma']) / latest['roll_yield_std']
                     if latest['roll_yield_std'] != 0 else 0
                 )
                 results.append(latest)
@@ -783,9 +783,9 @@ class RolloverStrategyAdapter:
             return pd.DataFrame()
 
         result_df = pd.DataFrame(results)
-        result_df['rank'] = result_df['rollover_return'].rank(ascending=False)
+        result_df['rank'] = result_df['roll_return'].rank(ascending=False)
 
-        return result_df[['underlying', 'rollover_return', 'roll_yield_ma',
+        return result_df[['underlying', 'roll_return', 'roll_yield_ma',
                          'roll_yield_zscore', 'rank', 'main_contract', 'next_contract']]
 
     def get_term_structure(

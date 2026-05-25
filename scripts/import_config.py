@@ -41,13 +41,13 @@ def get_db_connection():
     return engine
 
 
-def import_rollover_configs(session, loader: AssetConfigLoader, reset: bool = False):
-    """Import rollover configurations to database"""
-    configs = loader.get_all_rollover_configs()
+def import_roll_configs(session, loader: AssetConfigLoader, reset: bool = False):
+    """Import roll configurations to database"""
+    configs = loader.get_all_roll_configs()
 
     if reset:
-        logger.info("Clearing existing rollover_configs...")
-        session.execute(text("DELETE FROM rollover_configs"))
+        logger.info("Clearing existing roll_configs...")
+        session.execute(text("DELETE FROM roll_configs"))
         session.commit()
 
     imported_count = 0
@@ -56,7 +56,7 @@ def import_rollover_configs(session, loader: AssetConfigLoader, reset: bool = Fa
     for underlying, cfg in configs:
         # Check if config already exists
         existing = session.execute(
-            text("SELECT 1 FROM rollover_configs WHERE config_id = :config_id"),
+            text("SELECT 1 FROM roll_configs WHERE config_id = :config_id"),
             {"config_id": cfg.config_id}
         ).fetchone()
 
@@ -68,13 +68,13 @@ def import_rollover_configs(session, loader: AssetConfigLoader, reset: bool = Fa
         # Insert new config
         session.execute(
             text("""
-                INSERT INTO rollover_configs (
-                    config_id, underlying, config_name, rollover_type, price_type,
+                INSERT INTO roll_configs (
+                    config_id, underlying, config_name, roll_type, price_type,
                     roll_start_days, roll_end_days, roll_window, threshold,
                     condition_type, transaction_cost, lead_months, start_date,
                     data_source, update_flag, is_active
                 ) VALUES (
-                    :config_id, :underlying, :config_name, :rollover_type, :price_type,
+                    :config_id, :underlying, :config_name, :roll_type, :price_type,
                     :roll_start_days, :roll_end_days, :roll_window, :threshold,
                     :condition_type, :transaction_cost, :lead_months, :start_date,
                     :data_source, :update_flag, :is_active
@@ -82,7 +82,7 @@ def import_rollover_configs(session, loader: AssetConfigLoader, reset: bool = Fa
                 ON CONFLICT (config_id) DO UPDATE SET
                     underlying = EXCLUDED.underlying,
                     config_name = EXCLUDED.config_name,
-                    rollover_type = EXCLUDED.rollover_type,
+                    roll_type = EXCLUDED.roll_type,
                     price_type = EXCLUDED.price_type,
                     roll_start_days = EXCLUDED.roll_start_days,
                     roll_end_days = EXCLUDED.roll_end_days,
@@ -101,7 +101,7 @@ def import_rollover_configs(session, loader: AssetConfigLoader, reset: bool = Fa
                 "config_id": cfg.config_id,
                 "underlying": underlying,
                 "config_name": cfg.config_name,
-                "rollover_type": cfg.rollover_type.value,
+                "roll_type": cfg.roll_type.value,
                 "price_type": cfg.price_type.value,
                 "roll_start_days": cfg.roll_start_days,
                 "roll_end_days": cfg.roll_end_days,
@@ -120,7 +120,7 @@ def import_rollover_configs(session, loader: AssetConfigLoader, reset: bool = Fa
         logger.debug(f"Imported config: {cfg.config_id}")
 
     session.commit()
-    logger.info(f"Imported {imported_count} rollover configs, skipped {skipped_count}")
+    logger.info(f"Imported {imported_count} roll configs, skipped {skipped_count}")
     return imported_count, skipped_count
 
 
@@ -224,7 +224,7 @@ def validate_config(loader: AssetConfigLoader) -> bool:
 
             # Check type (S or D)
             if not (type_pq.startswith("S") or type_pq.startswith("D")):
-                logger.error(f"Invalid rollover type in config_id: {config_id}")
+                logger.error(f"Invalid roll type in config_id: {config_id}")
                 is_valid = False
 
             # Check price type
@@ -254,8 +254,8 @@ def main():
                         help="Validate config only, do not import")
     parser.add_argument("--reset", action="store_true",
                         help="Reset and reimport all configs")
-    parser.add_argument("--skip-rollover", action="store_true",
-                        help="Skip importing rollover configs")
+    parser.add_argument("--skip-roll", action="store_true",
+                        help="Skip importing roll configs")
     parser.add_argument("--skip-concat", action="store_true",
                         help="Skip importing concat configs")
 
@@ -294,9 +294,9 @@ def main():
 
     # Import configurations
     try:
-        if not args.skip_rollover:
-            logger.info("Importing rollover configurations...")
-            import_rollover_configs(session, loader, reset=args.reset)
+        if not args.skip_roll:
+            logger.info("Importing roll configurations...")
+            import_roll_configs(session, loader, reset=args.reset)
 
         if not args.skip_concat:
             logger.info("Importing concat asset configurations...")

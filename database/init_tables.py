@@ -205,7 +205,7 @@ def verify_tables():
         'target_positions',
         'actual_positions',
         'trades',
-        'rollover_executions',
+        'roll_executions',
         'index_components',
         'industry_classification',
         'hedge_instrument_mapping',

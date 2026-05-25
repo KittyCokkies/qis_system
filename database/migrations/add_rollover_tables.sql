@@ -1,14 +1,14 @@
--- ========================================================-- QIS System - Database Migration: Add Rollover Configuration Tables-- Version: 1.0-- =========================================================
+-- ========================================================-- QIS System - Database Migration: Add Roll Configuration Tables-- Version: 1.0-- =========================================================
 
--- ---------------------------------------------------------- 1. Rollover Configuration Table-- Stores all rollover configurations from config/assets.yaml-- --------------------------------------------------------
-CREATE TABLE IF NOT EXISTS rollover_configs (
+-- ---------------------------------------------------------- 1. Roll Configuration Table-- Stores all roll configurations from config/assets.yaml-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS roll_configs (
     config_id VARCHAR(30) PRIMARY KEY,
     -- 如: IF_S7q4_settle, RB_D72q34_close
     underlying VARCHAR(10) NOT NULL,
     -- 品种代码,如 IF, RB
     config_name VARCHAR(100),
     -- 配置中文名称
-    rollover_type VARCHAR(20) NOT NULL,
+    roll_type VARCHAR(20) NOT NULL,
     -- static / dynamic
     price_type VARCHAR(20) NOT NULL,
     -- settle / close
@@ -37,26 +37,26 @@ CREATE TABLE IF NOT EXISTS rollover_configs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- 约束
-    CONSTRAINT chk_rollover_type CHECK (rollover_type IN ('static', 'dynamic')),
+    CONSTRAINT chk_roll_type CHECK (roll_type IN ('static', 'dynamic')),
     CONSTRAINT chk_price_type CHECK (price_type IN ('settle', 'close')),
     CONSTRAINT chk_condition_type CHECK (condition_type IS NULL OR condition_type IN ('open_interest', 'volume'))
 );
 
 -- 索引
-CREATE INDEX IF NOT EXISTS idx_rollover_underlying ON rollover_configs(underlying);
-CREATE INDEX IF NOT EXISTS idx_rollover_active ON rollover_configs(is_active);
-CREATE INDEX IF NOT EXISTS idx_rollover_update ON rollover_configs(update_flag);
-CREATE INDEX IF NOT EXISTS idx_rollover_source ON rollover_configs(data_source);
+CREATE INDEX IF NOT EXISTS idx_roll_underlying ON roll_configs(underlying);
+CREATE INDEX IF NOT EXISTS idx_roll_active ON roll_configs(is_active);
+CREATE INDEX IF NOT EXISTS idx_roll_update ON roll_configs(update_flag);
+CREATE INDEX IF NOT EXISTS idx_roll_source ON roll_configs(data_source);
 
 -- 注释
-COMMENT ON TABLE rollover_configs IS '期货展期配置表';
-COMMENT ON COLUMN rollover_configs.config_id IS '配置唯一ID,如IF_S7q4_settle';
-COMMENT ON COLUMN rollover_configs.underlying IS '品种代码';
-COMMENT ON COLUMN rollover_configs.rollover_type IS '展期类型:static/dynamic';
-COMMENT ON COLUMN rollover_configs.price_type IS '价格类型:settle/close';
-COMMENT ON COLUMN rollover_configs.roll_start_days IS 'p:到期前p天开始观察';
-COMMENT ON COLUMN rollover_configs.roll_end_days IS 'q:到期前q天强制展期';
-COMMENT ON COLUMN rollover_configs.condition_type IS '动态展期条件:open_interest/volume';
+COMMENT ON TABLE roll_configs IS '期货展期配置表';
+COMMENT ON COLUMN roll_configs.config_id IS '配置唯一ID,如IF_S7q4_settle';
+COMMENT ON COLUMN roll_configs.underlying IS '品种代码';
+COMMENT ON COLUMN roll_configs.roll_type IS '展期类型:static/dynamic';
+COMMENT ON COLUMN roll_configs.price_type IS '价格类型:settle/close';
+COMMENT ON COLUMN roll_configs.roll_start_days IS 'p:到期前p天开始观察';
+COMMENT ON COLUMN roll_configs.roll_end_days IS 'q:到期前q天强制展期';
+COMMENT ON COLUMN roll_configs.condition_type IS '动态展期条件:open_interest/volume';
 
 -- --------------------------------------------------------
 -- 2. Sync Logs Table
@@ -101,7 +101,7 @@ COMMENT ON COLUMN sync_logs.data_source IS '数据源:tonglian/wind/bbg_excel';
 COMMENT ON COLUMN sync_logs.status IS '同步状态:success/failed/partial/running';
 
 -- --------------------------------------------------------
--- 3. Update prices_future_continuous table-- Add config_id column to link with rollover_configs-- --------------------------------------------------------
+-- 3. Update prices_future_continuous table-- Add config_id column to link with roll_configs-- --------------------------------------------------------
 
 -- 检查是否已存在config_id列
 DO $$
@@ -132,7 +132,7 @@ BEGIN
     ) THEN
         ALTER TABLE prices_future_continuous
         ADD CONSTRAINT fk_prices_fut_cont_config
-        FOREIGN KEY (config_id) REFERENCES rollover_configs(config_id)
+        FOREIGN KEY (config_id) REFERENCES roll_configs(config_id)
         ON DELETE SET NULL;
     END IF;
 END $$;
@@ -224,10 +224,10 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- 为rollover_configs添加触发器
-DROP TRIGGER IF EXISTS update_rollover_configs_updated_at ON rollover_configs;
-CREATE TRIGGER update_rollover_configs_updated_at
-    BEFORE UPDATE ON rollover_configs
+-- 为roll_configs添加触发器
+DROP TRIGGER IF EXISTS update_roll_configs_updated_at ON roll_configs;
+CREATE TRIGGER update_roll_configs_updated_at
+    BEFORE UPDATE ON roll_configs
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
@@ -242,8 +242,8 @@ CREATE TRIGGER update_concat_configs_updated_at
 -- 7. Initial Data Verification-- --------------------------------------------------------
 
 -- 验证表是否创建成功
-SELECT 'rollover_configs' as table_name, COUNT(*) as record_count
-FROM rollover_configs
+SELECT 'roll_configs' as table_name, COUNT(*) as record_count
+FROM roll_configs
 UNION ALL
 SELECT 'sync_logs', COUNT(*) FROM sync_logs
 UNION ALL

@@ -127,7 +127,7 @@ class DatabaseManager:
         """保存期货连续合约价格（展期后）
 
         Args:
-            df: DataFrame with columns from calculate_static_rollover()
+            df: DataFrame with columns from calculate_static_roll()
         """
         if df.empty:
             return False
@@ -439,16 +439,16 @@ class DatabaseManager:
 
     # ==================== 展期执行记录 ====================
 
-    def save_rollover_execution(self, df: pd.DataFrame) -> bool:
+    def save_roll_execution(self, df: pd.DataFrame) -> bool:
         """保存期货展期执行记录"""
         if df.empty:
             return False
         try:
-            df.to_sql("rollover_executions", self.engine, if_exists="append", index=False, method="multi")
-            logger.info(f"Saved {len(df)} rows to rollover_executions")
+            df.to_sql("roll_executions", self.engine, if_exists="append", index=False, method="multi")
+            logger.info(f"Saved {len(df)} rows to roll_executions")
             return True
         except Exception as e:
-            logger.error(f"Failed to save rollover executions: {e}")
+            logger.error(f"Failed to save roll executions: {e}")
             return False
 
     # ==================== 资产和基础数据 ====================
