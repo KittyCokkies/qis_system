@@ -1,7 +1,8 @@
 """
-Hedge Data Manager
+对冲数据管理模块
 
-Handles CRUD operations for hedge instruments and synthetic indices.
+处理对冲工具、合成指数、策略指数等数据的CRUD操作
+支持多对冲工具管理和比较
 """
 
 from datetime import datetime
@@ -15,13 +16,44 @@ from data.database.connection import DatabaseConnection
 
 
 class HedgeManager:
-    """对冲数据管理器"""
+    """对冲数据管理器
+
+    管理对冲策略相关的所有数据，包括：
+    - 对冲工具映射（期货、ETF、指增等）
+    - 合成指数序列（期货未上市时期的数据拼接）
+    - 策略指数序列（不同对冲工具下的策略表现）
+    - 策略对冲配置
+
+    Attributes:
+        _conn: 数据库连接对象
+
+    Example:
+        >>> db = DatabaseConnection()
+        >>> hm = HedgeManager(db)
+        >>> hedges = hm.get_hedge_instruments("000300.SH")
+    """
 
     def __init__(self, connection: DatabaseConnection):
+        """初始化对冲管理器
+
+        Args:
+            connection: 数据库连接对象
+        """
         self._conn = connection
 
+    # ==================== 对冲工具映射操作 ====================
+
     def save_hedge_instrument_mapping(self, df: pd.DataFrame) -> bool:
-        """保存对冲工具映射关系"""
+        """保存对冲工具映射关系
+
+        将对冲工具配置写入hedge_instrument_mapping表
+
+        Args:
+            df: DataFrame，包含列：[underlying_index, hedge_symbol, hedge_type, ...]
+
+        Returns:
+            bool: 保存成功返回True
+        """
         if df.empty:
             return False
         try:
@@ -40,10 +72,19 @@ class HedgeManager:
     ) -> pd.DataFrame:
         """查询标的指数的对冲工具列表
 
+        获取可用于对冲某指数的所有工具
+
         Args:
-            underlying_index: 标的指数，如 "000300.SH"
-            hedge_type: 筛选特定对冲类型
+            underlying_index: 标的指数，如 "000300.SH"（沪深300）
+            hedge_type: 筛选特定对冲类型，如 "index_future"/"etf"
             active_only: 只返回可用状态的工具
+
+        Returns:
+            pd.DataFrame: 对冲工具列表
+
+        Example:
+            >>> df = hm.get_hedge_instruments("000300.SH")
+            # 返回：IF（股指期货）、510300（300ETF）等
         """
         sql = "SELECT * FROM hedge_instrument_mapping WHERE underlying_index = :idx"
         params = {"idx": underlying_index}
@@ -57,8 +98,19 @@ class HedgeManager:
 
         return self._conn.execute_query(sql, params)
 
+    # ==================== 合成指数操作 ====================
+
     def save_synthetic_index(self, df: pd.DataFrame) -> bool:
-        """保存合成指数序列"""
+        """保存合成指数序列
+
+        将拼接后的指数数据写入synthetic_index_series表
+
+        Args:
+            df: DataFrame，包含列：[underlying_index, date, close, source_symbol, ...]
+
+        Returns:
+            bool: 保存成功返回True
+        """
         if df.empty:
             return False
         try:
@@ -75,7 +127,18 @@ class HedgeManager:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> pd.DataFrame:
-        """查询合成指数序列"""
+        """查询合成指数序列
+
+        从synthetic_index_series表查询拼接后的指数数据
+
+        Args:
+            underlying_index: 标的指数代码
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            pd.DataFrame: 合成指数数据
+        """
         sql = "SELECT * FROM synthetic_index_series WHERE underlying_index = :idx"
         params = {"idx": underlying_index}
         if start_date:
@@ -88,8 +151,19 @@ class HedgeManager:
 
         return self._conn.execute_query(sql, params)
 
+    # ==================== 策略指数操作 ====================
+
     def save_strategy_index_series(self, df: pd.DataFrame) -> bool:
-        """保存策略指数序列（不同对冲工具下的策略表现）"""
+        """保存策略指数序列
+
+        将不同对冲工具下的策略表现写入strategy_index_series表
+
+        Args:
+            df: DataFrame，包含列：[strategy_code, underlying_index, hedge_symbol, date, index_value, ...]
+
+        Returns:
+            bool: 保存成功返回True
+        """
         if df.empty:
             return False
         try:
@@ -110,8 +184,10 @@ class HedgeManager:
     ) -> pd.DataFrame:
         """查询策略指数序列
 
+        获取同一策略在不同对冲工具下的表现
+
         Returns:
-            DataFrame: 包含不同对冲工具下的策略指数点位
+            pd.DataFrame: 策略指数数据，包含不同对冲工具下的策略点位
         """
         sql = "SELECT * FROM strategy_index_series WHERE strategy_code = :code"
         params = {"code": strategy_code}
@@ -138,7 +214,18 @@ class HedgeManager:
         underlying_index: str,
         date: Optional[datetime] = None,
     ) -> pd.DataFrame:
-        """比较同一策略不同对冲工具的表现"""
+        """比较同一策略不同对冲工具的表现
+
+        计算不同对冲工具的收益率、成本差异
+
+        Args:
+            strategy_code: 策略代码
+            underlying_index: 标的指数
+            date: 比较日期，默认当天
+
+        Returns:
+            pd.DataFrame: 对冲工具对比数据
+        """
         if date is None:
             date = datetime.now()
 
@@ -174,8 +261,19 @@ class HedgeManager:
             "date": date
         })
 
+    # ==================== 策略对冲配置操作 ====================
+
     def save_strategy_hedge_config(self, df: pd.DataFrame) -> bool:
-        """保存策略对冲配置"""
+        """保存策略对冲配置
+
+        将策略的对冲配置写入strategy_hedge_config表
+
+        Args:
+            df: DataFrame，包含列：[strategy_code, underlying_index, primary_hedge, hedge_ratio, ...]
+
+        Returns:
+            bool: 保存成功返回True
+        """
         if df.empty:
             return False
         try:
@@ -192,7 +290,18 @@ class HedgeManager:
         underlying_index: Optional[str] = None,
         as_of_date: Optional[datetime] = None,
     ) -> pd.DataFrame:
-        """查询策略对冲配置"""
+        """查询策略对冲配置
+
+        获取策略当前生效的对冲配置
+
+        Args:
+            strategy_code: 策略代码
+            underlying_index: 标的指数
+            as_of_date: 生效日期，默认当前时间
+
+        Returns:
+            pd.DataFrame: 对冲配置数据
+        """
         if as_of_date is None:
             as_of_date = datetime.now()
 

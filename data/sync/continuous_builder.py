@@ -1,8 +1,8 @@
 """
 Continuous Contract Builder
 
-Builds continuous price series from individual futures contracts
-based on roll configurations.
+根据展期配置从期货原始合约构建连续价格序列
+支持静态和动态展期规则，处理双窗口展期逻辑
 """
 
 from datetime import date, timedelta
@@ -16,40 +16,62 @@ from data.future_roll import FutureRollAnalyzer
 
 
 class ContinuousContractBuilder:
-    """Builds continuous contract price series"""
+    """连续合约构建器
+
+    基于展期配置，将多个期货原始合约拼接成一条连续的价格序列
+    消除换月跳空，支持不同展期规则和价格类型
+
+    Attributes:
+        db: 数据库管理器
+        config_loader: 资产配置加载器
+        roll_analyzer: 展期分析器
+
+    Example:
+        >>> builder = ContinuousContractBuilder()
+        >>> # 构建单日连续合约
+        >>> builder.build_for_date('IF_S7q4_settle', date(2024, 1, 15))
+        >>> # 构建一段时间
+        >>> builder.build_for_range('IF_S7q4_settle', date(2024, 1, 1), date(2024, 12, 31))
+    """
 
     def __init__(self):
+        """初始化构建器"""
         self.db = DatabaseManager()
         self.config_loader = AssetConfigLoader()
         self.roll_analyzer = FutureRollAnalyzer()
 
     def build_for_date(self, config_id: str, build_date: date) -> int:
         """
-        Build continuous contract for a specific date
+        为特定日期构建连续合约
+
+        根据展期配置，确定当日应持有的合约，计算连续价格
 
         Args:
-            config_id: Rollover config ID (e.g., 'IF_S7q4_settle')
-            build_date: Date to build
+            config_id: 展期配置ID (例如: 'IF_S7q4_settle')
+            build_date: 构建日期
 
         Returns:
-            Number of records created (0 or 1)
+            int: 创建的记录数 (0 或 1)
+
+        Raises:
+            ValueError: 如果 config_id 不存在
         """
-        # Get config
+        # 获取配置
         config = self.config_loader.get_roll_config(config_id)
         if not config:
             raise ValueError(f"Unknown config_id: {config_id}")
 
-        # Get underlying
+        # 从 config_id 解析出品种代码
         underlying = config_id.split('_')[0]
 
-        # Get all contracts for this underlying on this date
+        # 获取该品种在该日期的所有合约
         contracts = self._get_contracts_for_date(underlying, build_date)
 
         if not contracts:
             logger.debug(f"No contracts found for {underlying} on {build_date}")
             return 0
 
-        # Determine current and next contracts based on roll rules
+        # 根据展期规则确定当前和下一合约
         current_contract, next_contract, days_to_expiry = self._determine_contracts(
             underlying, contracts, build_date, config
         )
@@ -58,13 +80,13 @@ class ContinuousContractBuilder:
             logger.debug(f"Could not determine current contract for {underlying} on {build_date}")
             return 0
 
-        # Get prices
+        # 获取价格
         current_price = self._get_contract_price(current_contract, build_date, config.price_type)
         next_price = None
         if next_contract:
             next_price = self._get_contract_price(next_contract, build_date, config.price_type)
 
-        # Calculate continuous price and roll info
+        # 计算连续价格和展期信息
         continuous_price = current_price
         price_diff = None
         roll_return = None
@@ -74,20 +96,20 @@ class ContinuousContractBuilder:
         if next_contract and next_price:
             price_diff = next_price - current_price if next_price and current_price else None
 
-            # Check if roll should occur
+            # 检查是否应该展期
             if days_to_expiry is not None:
                 if days_to_expiry <= config.roll_end_days:
-                    # Forced roll
+                    # 强制展期
                     is_roll_day = True
                     roll_type = 'forced_roll'
                 elif days_to_expiry <= config.roll_start_days:
-                    # Observation window - check dynamic conditions if applicable
+                    # 观察窗口 - 如果是动态展期则检查条件
                     if config.roll_type == RollType.DYNAMIC:
                         if self._should_roll_dynamic(underlying, current_contract, next_contract, build_date, config):
                             is_roll_day = True
                             roll_type = 'observation_roll'
 
-        # Insert continuous price record
+        # 插入连续价格记录
         self.db.execute("""
             INSERT INTO prices_future_continuous (
                 config_id, underlying, date,
@@ -120,15 +142,17 @@ class ContinuousContractBuilder:
 
     def build_for_range(self, config_id: str, start_date: date, end_date: date) -> int:
         """
-        Build continuous contracts for a date range
+        为日期范围构建连续合约
+
+        批量构建一段时间内的连续合约价格
 
         Args:
-            config_id: Rollover config ID
-            start_date: Start date
-            end_date: End date
+            config_id: 展期配置ID
+            start_date: 开始日期
+            end_date: 结束日期
 
         Returns:
-            Number of records created
+            int: 创建的记录总数
         """
         count = 0
         current = start_date
@@ -144,7 +168,7 @@ class ContinuousContractBuilder:
         return count
 
     def _get_contracts_for_date(self, underlying: str, query_date: date) -> List[str]:
-        """Get all available contract codes for an underlying on a date"""
+        """获取某一日期某品种的所有可用合约代码"""
         result = self.db.execute("""
             SELECT DISTINCT symbol FROM prices_future
             WHERE underlying = %s AND date = %s
@@ -154,7 +178,7 @@ class ContinuousContractBuilder:
         return [row[0] for row in result.fetchall()]
 
     def _get_contract_price(self, symbol: str, query_date: date, price_type: PriceType) -> Optional[float]:
-        """Get contract price (settle or close)"""
+        """获取合约价格 (结算价或收盘价)"""
         price_col = 'settle' if price_type == PriceType.SETTLE else 'close'
 
         result = self.db.execute(f"""
@@ -173,7 +197,7 @@ class ContinuousContractBuilder:
         config: RolloverConfig
     ) -> tuple:
         """
-        Determine current and next contracts
+        确定当前合约和下一合约
 
         Returns:
             (current_contract, next_contract, days_to_expiry)
@@ -181,15 +205,15 @@ class ContinuousContractBuilder:
         if not contracts:
             return None, None, None
 
-        # Parse contracts to get expiry dates
+        # 解析合约获取到期日
         future = self.config_loader.get_future(underlying)
         contract_expiries = []
 
         for contract in contracts:
             try:
                 _, year, month = future.parse_contract_code(contract)
-                # Simplified: Assume expiry is last Friday of month
-                # In production, should use actual expiry calendar
+                # 简化: 假设到期日是当月最后一个周五
+                # 生产环境应该使用实际到期日历
                 expiry = self._get_last_friday(year, month)
                 days_to_exp = (expiry - query_date).days
                 contract_expiries.append((contract, expiry, days_to_exp))
@@ -200,22 +224,22 @@ class ContinuousContractBuilder:
         if not contract_expiries:
             return None, None, None
 
-        # Sort by expiry
+        # 按到期日排序
         contract_expiries.sort(key=lambda x: x[1])
 
-        # Current contract is the one with largest OI (simplified)
-        # In production, should query actual OI data
-        # For now, use the first contract that hasn't expired
+        # 当前合约是持仓量最大的 (简化)
+        # 生产环境应该查询实际持仓量数据
+        # 现在使用第一个未过期的合约
         current = None
         next_contract = None
         days_to_expiry = None
 
         for i, (contract, expiry, days) in enumerate(contract_expiries):
-            if days >= 0:  # Not expired
+            if days >= 0:  # 未过期
                 if current is None:
                     current = contract
                     days_to_expiry = days
-                    # Next contract is the one after current
+                    # 下一合约是当前合约之后的那个
                     if i + 1 < len(contract_expiries):
                         next_contract = contract_expiries[i + 1][0]
                 break
@@ -231,12 +255,12 @@ class ContinuousContractBuilder:
         config: RolloverConfig
     ) -> bool:
         """
-        Check if should roll based on dynamic conditions
+        根据动态条件检查是否应该展期
 
-        For OI-driven: roll when next contract OI > current contract OI * threshold
-        For volume-driven: roll when next contract volume > current contract volume * threshold
+        对于持仓量驱动: 当下一合约持仓量 > 当前合约持仓量 * 阈值时展期
+        对于成交量驱动: 当下一合约成交量 > 当前合约成交量 * 阈值时展期
         """
-        # Get OI or volume for both contracts
+        # 获取两个合约的持仓量或成交量
         metric = 'open_interest' if config.condition_type != 'volume' else 'volume'
 
         result = self.db.execute(f"""
@@ -261,14 +285,14 @@ class ContinuousContractBuilder:
 
     @staticmethod
     def _get_last_friday(year: int, month: int) -> date:
-        """Get the last Friday of a month (simplified expiry rule)"""
+        """获取某月最后一个周五 (简化版到期日规则)"""
         import calendar
 
-        # Get last day of month
+        # 获取当月最后一天
         last_day = calendar.monthrange(year, month)[1]
         last_date = date(year, month, last_day)
 
-        # Find last Friday (Friday = 4)
+        # 找到最后一个周五 (周五 = 4)
         while last_date.weekday() != 4:
             last_date -= timedelta(days=1)
 

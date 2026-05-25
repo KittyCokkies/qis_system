@@ -36,7 +36,15 @@ class RollSignalType(str, Enum):
 
 @dataclass
 class RollConfig:
-    """展期配置"""
+    """展期配置
+
+    Attributes:
+        price_type: 结算价格类型
+        signal_type: 主力合约识别方式
+        days_before_expiry: 到期前N天开始考虑换仓
+        min_roll_days: 最小展期天数（避免到期日换仓）
+        weights: 综合评分权重
+    """
     price_type: RollPriceType = RollPriceType.CLOSE
     signal_type: RollSignalType = RollSignalType.OPEN_INTEREST
     days_before_expiry: int = 5       # 到期前N天开始考虑换仓
@@ -44,6 +52,7 @@ class RollConfig:
     weights: Dict[str, float] = None  # 综合评分权重（如使用COMBINED）
 
     def __post_init__(self):
+        """初始化后处理，设置默认权重"""
         if self.weights is None:
             self.weights = {"open_interest": 0.6, "volume": 0.4}
 
