@@ -541,3 +541,38 @@ CREATE TABLE IF NOT EXISTS strategy_hedge_config (
 );
 
 CREATE INDEX idx_strat_hedge_config ON strategy_hedge_config(strategy_code, effective_date DESC);
+
+-- --------------------------------------------------------
+-- 表注释（中文描述）
+-- --------------------------------------------------------
+
+COMMENT ON TABLE assets IS '资产主表：统一管理所有可交易标的（股票、期货、ETF、指数等）';
+COMMENT ON TABLE trade_calendar IS '交易日历：记录各交易所的交易日、假日信息';
+
+COMMENT ON TABLE prices_stock IS '股票价格表：股票和ETF的前复权日频行情数据';
+COMMENT ON TABLE prices_future IS '期货价格表：期货原始合约的日频行情数据（含结算价、持仓量）';
+COMMENT ON TABLE prices_future_continuous IS '期货连续合约表：展期处理后的连续价格序列（支持双窗口p/q参数）';
+COMMENT ON TABLE prices_index IS '指数价格表：指数日频行情及估值指标（PE/PB/股息率）';
+
+COMMENT ON TABLE factors_asset IS '资产因子表：通用因子数据（价值、动量、波动率、质量等）';
+COMMENT ON TABLE factors_commodity IS '商品因子表：商品期货专用因子（展期收益、基差等）';
+
+COMMENT ON TABLE fx_rates IS '汇率表：外汇即期和远期汇率数据';
+COMMENT ON TABLE macro_indicators IS '宏观经济指标表：GDP、CPI、PMI等宏观数据';
+COMMENT ON TABLE market_regime IS '市场状态表：市场状态分类（牛/熊/震荡/高波动）及择时信号';
+
+COMMENT ON TABLE strategies IS '策略主表：策略基本信息、参数配置';
+COMMENT ON TABLE strategy_nav IS '策略净值表：策略每日净值、收益率、回撤等业绩指标';
+COMMENT ON TABLE target_positions IS '目标持仓表：策略生成的目标权重和交易信号';
+COMMENT ON TABLE actual_positions IS '实际持仓表：实际执行的持仓和盈亏情况';
+COMMENT ON TABLE trades IS '交易记录表：成交明细（价格、数量、成本、滑点）';
+COMMENT ON TABLE rollover_executions IS '展期执行记录表：期货合约换月执行记录及成本';
+
+COMMENT ON TABLE index_components IS '指数成分股表：指数成分及其权重变化';
+COMMENT ON TABLE industry_classification IS '行业分类表：股票的行业分类（一级/二级/三级）';
+
+COMMENT ON TABLE hedge_instrument_mapping IS '对冲工具映射表：同一标的指数的多对冲工具配置（期货/ETF/指增）';
+COMMENT ON TABLE synthetic_index_series IS '合成指数序列表：期货未上市时期的指数拼接数据';
+COMMENT ON TABLE strategy_index_series IS '策略指数序列表：同一策略使用不同对冲工具计算的指数点位';
+COMMENT ON TABLE hedge_comparison IS '对冲工具比较表：不同对冲工具的收益/成本对比';
+COMMENT ON TABLE strategy_hedge_config IS '策略对冲配置表：策略当前使用的对冲工具及切换规则';

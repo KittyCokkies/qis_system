@@ -21,7 +21,8 @@ def parse_sql_file(sql_content: str) -> tuple:
     """解析SQL文件，分离不同类型的语句
 
     Returns:
-        (create_table_stmts, create_index_stmts, other_stmts)
+        (create_table_stmts, create_view_stmts, function_stmts,
+         create_index_stmts, trigger_stmts, comment_stmts, other_stmts)
     """
     # 按行分割并处理
     lines = sql_content.split('\n')
@@ -31,6 +32,7 @@ def parse_sql_file(sql_content: str) -> tuple:
     create_view_stmts = []
     function_stmts = []
     trigger_stmts = []
+    comment_stmts = []
     other_stmts = []
 
     current_stmt = []
@@ -39,8 +41,8 @@ def parse_sql_file(sql_content: str) -> tuple:
     for line in lines:
         stripped = line.strip()
 
-        # 跳过注释和空行
-        if not stripped or stripped.startswith('--'):
+        # 跳过纯注释行，但保留当前语句中的注释
+        if not stripped or (stripped.startswith('--') and not current_stmt):
             continue
 
         # 检测函数/触发器开始
@@ -70,16 +72,19 @@ def parse_sql_file(sql_content: str) -> tuple:
                 create_view_stmts.append(stmt)
             elif 'CREATE TRIGGER' in upper_stmt:
                 trigger_stmts.append(stmt)
+            elif 'COMMENT ON' in upper_stmt:
+                comment_stmts.append(stmt)
             else:
                 other_stmts.append(stmt)
 
-    # 执行顺序：表 -> 视图 -> 函数 -> 索引 -> 触发器
+    # 执行顺序：表 -> 视图 -> 函数 -> 索引 -> 触发器 -> 注释
     return (
         create_table_stmts,
         create_view_stmts,
         function_stmts,
         create_index_stmts,
         trigger_stmts,
+        comment_stmts,
         other_stmts
     )
 
@@ -132,11 +137,11 @@ def init_database():
         sql_content = f.read()
 
     # 解析SQL语句
-    tables, views, functions, indexes, triggers, others = parse_sql_file(sql_content)
+    tables, views, functions, indexes, triggers, comments, others = parse_sql_file(sql_content)
 
     logger.info(f"Parsed SQL: {len(tables)} tables, {len(views)} views, "
                 f"{len(functions)} functions, {len(indexes)} indexes, "
-                f"{len(triggers)} triggers")
+                f"{len(triggers)} triggers, {len(comments)} comments")
 
     with engine.connect() as conn:
         with conn.begin():
@@ -164,7 +169,12 @@ def init_database():
                 logger.info("Creating triggers...")
                 execute_statements(conn, triggers, "TRIGGER")
 
-            # 6. 其他语句
+            # 6. 添加表注释
+            if comments:
+                logger.info("Adding table comments...")
+                execute_statements(conn, comments, "COMMENT")
+
+            # 7. 其他语句
             if others:
                 logger.info("Executing other statements...")
                 execute_statements(conn, others, "OTHER")
