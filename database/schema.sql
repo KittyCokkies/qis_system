@@ -428,3 +428,116 @@ CREATE TRIGGER update_assets_updated_at BEFORE UPDATE ON assets
 
 CREATE TRIGGER update_strategies_updated_at BEFORE UPDATE ON strategies
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- --------------------------------------------------------
+-- 11. 对冲策略专用表
+-- --------------------------------------------------------
+
+-- 对冲工具映射表（同一标的的多对冲工具选择）
+CREATE TABLE IF NOT EXISTS hedge_instrument_mapping (
+    id SERIAL PRIMARY KEY,
+    underlying_index VARCHAR(20) NOT NULL,        -- 标的指数，如 "000300.SH" (沪深300)
+    hedge_symbol VARCHAR(20) NOT NULL,            -- 对冲工具代码
+    hedge_type VARCHAR(20) NOT NULL,              -- 对冲类型：index_future/etf/index_enhanced/synthetic
+    hedge_name VARCHAR(100),                      -- 对冲工具名称
+    tracking_index VARCHAR(20),                   -- 跟踪的指数（ETF/指增可能跟踪不同指数）
+    expense_ratio DECIMAL(6, 4),                  -- 费率（ETF/指增的管理费）
+    tracking_error DECIMAL(8, 4),                 -- 跟踪误差
+    is_active BOOLEAN DEFAULT TRUE,               -- 是否可用
+    start_date DATE,                              -- 上市/可用日期
+    end_date DATE,                                -- 退市/停止日期
+    priority INTEGER DEFAULT 1,                   -- 优先级（用于默认选择）
+    description TEXT,                             -- 说明
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(underlying_index, hedge_symbol),
+    FOREIGN KEY (underlying_index) REFERENCES assets(symbol) ON DELETE CASCADE,
+    FOREIGN KEY (hedge_symbol) REFERENCES assets(symbol) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_hedge_map_underlying ON hedge_instrument_mapping(underlying_index);
+CREATE INDEX idx_hedge_map_symbol ON hedge_instrument_mapping(hedge_symbol);
+CREATE INDEX idx_hedge_map_type ON hedge_instrument_mapping(hedge_type);
+
+-- 合成指数序列表（用于期货未上市时的指数拼接）
+CREATE TABLE IF NOT EXISTS synthetic_index_series (
+    id BIGSERIAL PRIMARY KEY,
+    underlying_index VARCHAR(20) NOT NULL,        -- 标的指数
+    date DATE NOT NULL,                           -- 日期
+    close DECIMAL(12, 4),                         -- 收盘价
+    source_type VARCHAR(20),                      -- 来源：index/future/etf/composite
+    source_symbol VARCHAR(20),                    -- 来源代码
+    is_interpolated BOOLEAN DEFAULT FALSE,        -- 是否插值（用于非交易日）
+    interpolation_method VARCHAR(20),             -- 插值方法
+    data_quality_score DECIMAL(3, 2),             -- 数据质量评分 0-1
+    UNIQUE(underlying_index, date),
+    FOREIGN KEY (underlying_index) REFERENCES assets(symbol) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_synthetic_idx_underlying ON synthetic_index_series(underlying_index, date DESC);
+
+-- 策略指数计算表（同一策略使用不同对冲工具计算的指数点位）
+CREATE TABLE IF NOT EXISTS strategy_index_series (
+    id BIGSERIAL PRIMARY KEY,
+    strategy_code VARCHAR(30) NOT NULL,           -- 策略代码
+    underlying_index VARCHAR(20) NOT NULL,        -- 标的指数
+    hedge_symbol VARCHAR(20) NOT NULL,            -- 使用的对冲工具
+    hedge_type VARCHAR(20) NOT NULL,              -- 对冲类型
+    date DATE NOT NULL,                           -- 日期
+    index_value DECIMAL(12, 4) NOT NULL,          -- 策略指数点位
+    daily_return DECIMAL(10, 6),                  -- 日收益率
+    cumulative_return DECIMAL(12, 6),             -- 累计收益率
+    alpha DECIMAL(10, 6),                         -- 超额收益
+    beta DECIMAL(8, 4),                           -- Beta
+    tracking_error DECIMAL(10, 6),                -- 跟踪误差
+    information_ratio DECIMAL(8, 4),              -- 信息比率
+    hedge_cost DECIMAL(10, 6),                    -- 对冲成本
+    roll_cost DECIMAL(10, 6),                     -- 展期成本（期货用）
+    financing_cost DECIMAL(10, 6),                -- 资金成本
+    is_backtest BOOLEAN DEFAULT FALSE,            -- 是否回测数据
+    UNIQUE(strategy_code, underlying_index, hedge_symbol, date),
+    FOREIGN KEY (strategy_code) REFERENCES strategies(strategy_code) ON DELETE CASCADE,
+    FOREIGN KEY (hedge_symbol) REFERENCES assets(symbol) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_strat_idx_series ON strategy_index_series(strategy_code, date DESC);
+CREATE INDEX idx_strat_idx_hedge ON strategy_index_series(strategy_code, hedge_symbol, date DESC);
+
+-- 对冲工具比较表（同一策略不同对冲工具的表现对比）
+CREATE TABLE IF NOT EXISTS hedge_comparison (
+    id BIGSERIAL PRIMARY KEY,
+    strategy_code VARCHAR(30) NOT NULL,           -- 策略代码
+    underlying_index VARCHAR(20) NOT NULL,        -- 标的指数
+    date DATE NOT NULL,                           -- 日期
+    hedge_symbol_1 VARCHAR(20) NOT NULL,          -- 对冲工具1
+    hedge_symbol_2 VARCHAR(20) NOT NULL,          -- 对冲工具2
+    return_diff DECIMAL(10, 6),                   -- 收益差异
+    cost_diff DECIMAL(10, 6),                     -- 成本差异
+    tracking_diff DECIMAL(10, 6),                 -- 跟踪差异
+    recommendation VARCHAR(20),                   -- 推荐：hedge_1/hedge_2/neutral
+    FOREIGN KEY (strategy_code) REFERENCES strategies(strategy_code) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_hedge_comp ON hedge_comparison(strategy_code, date DESC);
+
+-- 策略对冲配置表（记录策略当前使用的对冲工具配置）
+CREATE TABLE IF NOT EXISTS strategy_hedge_config (
+    id SERIAL PRIMARY KEY,
+    strategy_code VARCHAR(30) NOT NULL,           -- 策略代码
+    underlying_index VARCHAR(20) NOT NULL,        -- 标的指数
+    primary_hedge VARCHAR(20) NOT NULL,           -- 主对冲工具
+    secondary_hedge VARCHAR(20),                  -- 备用对冲工具
+    hedge_ratio DECIMAL(5, 4) DEFAULT 1.0,        -- 对冲比例
+    roll_start_days INTEGER DEFAULT 10,           -- 展期观察窗口p
+    roll_end_days INTEGER DEFAULT 3,              -- 展期强制窗口q
+    use_synthetic BOOLEAN DEFAULT FALSE,          -- 是否使用合成指数
+    switch_threshold DECIMAL(5, 4),               -- 切换阈值（成本差异超过此值切换）
+    auto_switch BOOLEAN DEFAULT FALSE,            -- 是否自动切换
+    effective_date DATE NOT NULL,                 -- 生效日期
+    expiry_date DATE,                             -- 失效日期
+    is_active BOOLEAN DEFAULT TRUE,               -- 是否生效
+    FOREIGN KEY (strategy_code) REFERENCES strategies(strategy_code) ON DELETE CASCADE,
+    FOREIGN KEY (primary_hedge) REFERENCES assets(symbol) ON DELETE CASCADE,
+    FOREIGN KEY (secondary_hedge) REFERENCES assets(symbol) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_strat_hedge_config ON strategy_hedge_config(strategy_code, effective_date DESC);
