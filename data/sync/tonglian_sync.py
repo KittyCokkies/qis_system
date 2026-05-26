@@ -82,8 +82,8 @@ class TonglianSync:
         if full_refresh:
             # 先删除现有数据
             self.db.execute(
-                "DELETE FROM prices_future WHERE underlying = %s AND date = %s",
-                (underlying, sync_date)
+                "DELETE FROM prices_future WHERE underlying = :underlying AND date = :date",
+                {"underlying": underlying, "date": sync_date}
             )
 
         # 插入数据
@@ -93,7 +93,8 @@ class TonglianSync:
                 INSERT INTO prices_future
                 (symbol, underlying, date, open, high, low, close, settle,
                  volume, amount, open_interest)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (:symbol, :underlying, :date, :open, :high, :low, :close, :settle,
+                 :volume, :amount, :open_interest)
                 ON CONFLICT (symbol, date) DO UPDATE SET
                     open = EXCLUDED.open,
                     high = EXCLUDED.high,
@@ -103,12 +104,19 @@ class TonglianSync:
                     volume = EXCLUDED.volume,
                     amount = EXCLUDED.amount,
                     open_interest = EXCLUDED.open_interest
-            """, (
-                record['symbol'], underlying, sync_date,
-                record['open'], record['high'], record['low'],
-                record['close'], record['settle'],
-                record['volume'], record['amount'], record['open_interest']
-            ))
+            """, {
+                "symbol": record['symbol'],
+                "underlying": underlying,
+                "date": sync_date,
+                "open": record['open'],
+                "high": record['high'],
+                "low": record['low'],
+                "close": record['close'],
+                "settle": record['settle'],
+                "volume": record['volume'],
+                "amount": record['amount'],
+                "open_interest": record['open_interest']
+            })
 
         logger.debug(f"已为 {underlying} 导入 {len(records)} 条记录，日期: {sync_date}")
         return len(records)
