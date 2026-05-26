@@ -41,11 +41,11 @@ class TonglianSync:
             self._connected = False
             logger.info("Disconnected from Tonglian")
 
-    def get_active_configs(self) -> List[Tuple[str, RollConfig]]:
+    def get_active_configs(self) -> List[Tuple[str, RolloverConfig]]:
         """Get all active roll configurations"""
         return self.config_loader.get_active_roll_configs()
 
-    def get_configs_for_underlying(self, underlying: str) -> List[Tuple[str, RollConfig]]:
+    def get_configs_for_underlying(self, underlying: str) -> List[Tuple[str, RolloverConfig]]:
         """Get configs for specific underlying"""
         future = self.config_loader.get_future(underlying)
         if future:
