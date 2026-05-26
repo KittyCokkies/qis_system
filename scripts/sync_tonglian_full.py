@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from datetime import datetime, date
 from loguru import logger
 from tqdm import tqdm
+import pandas as pd
 
 from data.tonglian_source import TonglianSource
 from data.sync.tonglian_sync import TonglianSync
@@ -18,28 +19,62 @@ from data.database import DatabaseManager
 
 
 def import_contracts(underlying: str, source: TonglianSource, db: DatabaseManager) -> int:
-    """导入合约到 assets 表"""
+    """导入合约到 assets 表，包含合约详细信息"""
+    # 从 mkt_futd 获取合约基础信息
     contracts = source.get_future_contracts(underlying, start_date=datetime(2024, 1, 1))
+
+    # 从 futu 表获取合约详细信息（乘数、tick size等）
+    details = source.get_contract_details(underlying)
+    details_dict = details.set_index('symbol').to_dict('index') if not details.empty else {}
+
     count = 0
 
     for _, row in contracts.iterrows():
+        symbol = row['symbol']
+        detail = details_dict.get(symbol, {})
+
         try:
+            # 如果有详细信息，使用；否则使用默认值
+            list_date = detail.get('list_date')
+            last_trade_date = detail.get('last_trade_date')
+
+            # 将 Timestamp 转换为 date 对象
+            if pd.notna(list_date) and hasattr(list_date, 'date'):
+                list_date = list_date.date()
+            if pd.notna(last_trade_date) and hasattr(last_trade_date, 'date'):
+                last_trade_date = last_trade_date.date()
+
             db.execute('''
-                INSERT INTO assets (symbol, underlying, name, asset_class, exchange, is_active)
-                VALUES (:symbol, :underlying, :name, :asset_class, :exchange, :is_active)
-                ON CONFLICT (symbol) DO NOTHING
+                INSERT INTO assets
+                (symbol, underlying, name, asset_class, exchange, is_active,
+                 contract_month, list_date, delist_date, multiplier, tick_size)
+                VALUES (:symbol, :underlying, :name, :asset_class, :exchange, :is_active,
+                        :contract_month, :list_date, :delist_date, :multiplier, :tick_size)
+                ON CONFLICT (symbol) DO UPDATE SET
+                    contract_month = EXCLUDED.contract_month,
+                    list_date = EXCLUDED.list_date,
+                    delist_date = EXCLUDED.delist_date,
+                    multiplier = EXCLUDED.multiplier,
+                    tick_size = EXCLUDED.tick_size,
+                    updated_at = CURRENT_TIMESTAMP
             ''', {
-                'symbol': row['symbol'],
+                'symbol': symbol,
                 'underlying': row['underlying'],
-                'name': row['symbol'],
+                'name': symbol,
                 'asset_class': 'future',
-                'exchange': row.get('exchange', 'CFFEX'),
-                'is_active': True
+                'exchange': detail.get('exchange', row.get('exchange', 'CFFEX')),
+                'is_active': True,
+                'contract_month': detail.get('contract_month'),
+                'list_date': list_date,
+                'delist_date': last_trade_date,
+                'multiplier': detail.get('multiplier'),
+                'tick_size': detail.get('tick_size')
             })
             count += 1
         except Exception as e:
-            logger.warning(f"导入 {row['symbol']} 失败: {e}")
+            logger.warning(f"导入 {symbol} 失败: {e}")
 
+    logger.info(f"导入 {underlying}: {count} 个合约，futu 详情表匹配 {len(details_dict)} 个")
     return count
 
 

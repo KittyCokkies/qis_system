@@ -381,6 +381,72 @@ class TonglianSource(DataSourceBase):
 
         return df
 
+    def get_contract_details(
+        self,
+        contract_object: str
+    ) -> pd.DataFrame:
+        """从 futu 表获取期货合约详细信息
+
+        表: futu (期货合约信息表)
+        关键字段:
+            TICKER_SYMBOL - 合约代码
+            CONT_MULT_NUM - 合约乘数
+            MIN_CHG_PRICE_NUM - 最小变动价位
+            LIST_DATE - 上市日期
+            LAST_TRADE_DATE - 最后交易日
+            DELI_YEAR/DELI_MONTH - 交割年月
+
+        Args:
+            contract_object: 品种代码，如 'IF', 'RB'
+
+        Returns:
+            DataFrame with columns:
+                symbol, multiplier, tick_size, list_date, last_trade_date,
+                deli_year, deli_month, contract_month, exchange
+        """
+        sql = f"""
+            SELECT DISTINCT
+                TICKER_SYMBOL as symbol,
+                CONT_MULT_NUM as multiplier,
+                MIN_CHG_PRICE_NUM as tick_size,
+                LIST_DATE as list_date,
+                LAST_TRADE_DATE as last_trade_date,
+                DELI_YEAR as deli_year,
+                DELI_MONTH as deli_month,
+                EXCHANGE_CD as exchange
+            FROM futu
+            WHERE CONTRACT_OBJECT = '{contract_object}'
+            ORDER BY LIST_DATE
+        """
+
+        df = self._execute_query(sql)
+
+        if not df.empty:
+            # 去重（以防万一）
+            df = df.drop_duplicates(subset=['symbol'])
+
+            # 转换日期格式
+            df['list_date'] = pd.to_datetime(df['list_date'])
+            df['last_trade_date'] = pd.to_datetime(df['last_trade_date'])
+
+            # 构建合约月份 (如 202401)
+            df['contract_month'] = df['deli_year'].astype(str).str.replace('.0', '', regex=False) + \
+                                   df['deli_month'].astype(int).astype(str).str.zfill(2)
+
+            # 标准化交易所代码
+            exchange_map = {
+                'XSHG': 'SSE',      # 上交所
+                'XSHE': 'SZSE',     # 深交所
+                'CCFX': 'CFFEX',    # 中金所
+                'XSGE': 'SHFE',     # 上期所
+                'XDCE': 'DCE',      # 大商所
+                'XZCE': 'CZCE',     # 郑商所
+                'XINE': 'INE',      # 上期能源
+            }
+            df['exchange'] = df['exchange'].map(exchange_map).fillna(df['exchange'])
+
+        return df
+
     def get_contracts_by_date(
         self,
         contract_object: str,
