@@ -201,7 +201,7 @@ class VolatilityCarryCalculator:
         front_greeks = calc.calculate(front_contract, spot, front_vol)
         back_greeks = calc.calculate(back_contract, spot, back_vol)
 
-        # 计算vega加权比例
+        # 计算 vega 加权比例
         if front_greeks.vega != 0:
             hedge_ratio = back_greeks.vega / front_greeks.vega
         else:

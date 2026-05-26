@@ -1,8 +1,8 @@
 """
-Sync Configuration Loader
+同步配置加载器
 
-Loads configuration from database (as opposed to YAML files).
-Used during sync operations.
+从数据库加载配置（而非 YAML 文件）
+用于同步操作
 """
 
 from typing import List, Optional
@@ -15,7 +15,7 @@ from data.config.models import RolloverType, PriceType, ConditionType
 
 @dataclass
 class DBRolloverConfig:
-    """Rollover config from database"""
+    """来自数据库的展期配置"""
     config_id: str
     underlying: str
     roll_type: RolloverType
@@ -28,20 +28,20 @@ class DBRolloverConfig:
 
 
 class SyncConfigLoader:
-    """Loads sync configuration from database"""
+    """从数据库加载同步配置"""
 
     def __init__(self):
         self.db = DatabaseManager()
 
     def get_active_roll_configs(self, data_source: Optional[str] = None) -> List[DBRolloverConfig]:
         """
-        Get active roll configurations from database
+        从数据库获取活跃的展期配置
 
         Args:
-            data_source: Filter by data source (optional)
+            data_source: 按数据源筛选（可选）
 
         Returns:
-            List of DBRolloverConfig
+            DBRolloverConfig 列表
         """
         sql = """
             SELECT config_id, underlying, roll_type, price_type,
@@ -77,7 +77,7 @@ class SyncConfigLoader:
         return configs
 
     def get_config(self, config_id: str) -> Optional[DBRolloverConfig]:
-        """Get a specific roll config"""
+        """获取特定展期配置"""
         result = self.db.execute("""
             SELECT config_id, underlying, roll_type, price_type,
                    roll_start_days, roll_end_days, threshold,
@@ -103,7 +103,7 @@ class SyncConfigLoader:
         )
 
     def get_last_sync_date(self, data_source: str) -> Optional[date]:
-        """Get last successful sync date for a data source"""
+        """获取数据源的最后一次成功同步日期"""
         result = self.db.execute("""
             SELECT MAX(sync_date)
             FROM sync_logs
@@ -114,7 +114,7 @@ class SyncConfigLoader:
         return row[0] if row and row[0] else None
 
     def log_sync_start(self, sync_date: date, data_source: str, asset_type: str) -> int:
-        """Log sync start, returns log ID"""
+        """记录同步开始，返回日志 ID"""
         result = self.db.execute("""
             INSERT INTO sync_logs (sync_date, data_source, asset_type, status, started_at)
             VALUES (%s, %s, %s, 'running', CURRENT_TIMESTAMP)
@@ -130,7 +130,7 @@ class SyncConfigLoader:
         records_count: int = 0,
         error_message: str = None
     ):
-        """Log sync completion"""
+        """记录同步完成"""
         self.db.execute("""
             UPDATE sync_logs
             SET status = %s,

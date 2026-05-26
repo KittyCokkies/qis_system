@@ -5,7 +5,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool, create_engine
 from alembic import context
 
-# Add project root to path
+# 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from config import get_settings

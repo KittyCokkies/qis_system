@@ -36,7 +36,7 @@ class TonglianConfig(BaseSettings):
     @property
     def url(self) -> str:
         from urllib.parse import quote
-        # 对密码进行URL编码（处理@等特殊字符）
+        # 对密码进行 URL 编码（处理@等特殊字符）
         encoded_password = quote(self.password, safe='')
         return f"mysql+pymysql://{self.user}:{encoded_password}@{self.host}:{self.port}/{self.database}?charset={self.charset}"
 

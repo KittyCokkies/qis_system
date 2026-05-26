@@ -103,7 +103,7 @@ class AKShareSource(DataSourceBase):
         symbol = symbol.replace(".SZ", "").replace(".SH", "").replace(".", "")
 
         try:
-            # AKShare的分钟数据接口
+            # AKShare 分钟数据接口
             period_map = {
                 "1min": "1",
                 "5min": "5",

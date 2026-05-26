@@ -10,7 +10,7 @@ from loguru import logger
 from data.tonglian_source import TonglianSource
 from data.config.loader import AssetConfigLoader
 
-# Setup logging
+# 设置日志
 logger.remove()
 logger.add(sys.stdout, level="INFO")
 

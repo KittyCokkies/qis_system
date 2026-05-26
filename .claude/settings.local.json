@@ -9,7 +9,10 @@
       "Bash(ping *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(grep -r \"^\\\\s*#.*[a-zA-Z]\\\\{3,\\\\}\" --include=\"*.py\" data/ scripts/ tests/ research/ alembic/)",
+      "Bash(grep -r \"^\\\\s*#.*[a-zA-Z]\\\\{3,\\\\}\" --include=\"*.py\" data/ scripts/ tests/ research/ alembic/ strategies/ models/ config/ backtest/)",
+      "Bash(grep -r '\"\"\".*[a-zA-Z]\\\\{5,\\\\}' --include=\"*.py\" data/ scripts/ tests/ research/)"
     ]
   }
 }

@@ -20,7 +20,7 @@ class TestBlackScholes:
 
     def test_call_option_price(self):
         """测试看涨期权定价"""
-        # ATM call
+        # 平值看涨期权
         price = BlackScholesModel.price("call", 100, 100, 0.25, 0.05, 0.2)
         assert price > 0
         assert price < 100

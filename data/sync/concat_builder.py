@@ -17,7 +17,7 @@ from data.database import DatabaseManager
 
 
 class ConcatBuilder:
-    """Builds concat assets"""
+    """构建拼接资产"""
 
     def __init__(self):
         self.db = DatabaseManager()
@@ -45,13 +45,13 @@ class ConcatBuilder:
         if not asset:
             raise ValueError(f"Unknown concat asset: {symbol}")
 
-        # Find which component is active for this date
+        # 查找该日期哪个成分处于活跃状态
         component = asset.get_component_for_date(build_date)
         if not component:
             logger.debug(f"No component for {symbol} on {build_date}")
             return 0
 
-        # Get price data for the component
+        # 获取成分的价格数据
         price = self._get_component_price(component.symbol, build_date)
 
         if price is None:

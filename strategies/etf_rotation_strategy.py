@@ -67,7 +67,7 @@ class ETFRotationStrategy(StrategyBase):
                 weights={s: 1.0/len(self.current_holdings) for s in self.current_holdings} if self.current_holdings else {}
             )
 
-        # 计算ETF得分
+        # 计算 ETF 得分
         scores = self._calculate_scores(data)
 
         if scores.empty:
