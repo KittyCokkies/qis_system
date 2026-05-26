@@ -10,29 +10,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from config import get_settings
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# Alembic 配置对象，提供对正在使用的 .ini 文件中值的访问
 config = context.config
 
-# Interpret the config file for Python logging.
+# 解释 Python 日志的配置文件
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Get database URL from project settings
+# 从项目设置获取数据库 URL
 settings = get_settings()
 DATABASE_URL = settings.database.url
 
-# For autogenerate support (optional, if using SQLAlchemy models)
+# 用于自动生成支持（可选，如果使用 SQLAlchemy 模型）
 target_metadata = None
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
+# 可以从配置中获取其他值，由 env.py 的需求定义：
 # my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# ... 等等
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
+    """在离线模式下运行迁移"""
     context.configure(
         url=DATABASE_URL,
         target_metadata=target_metadata,
@@ -45,7 +43,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+    """在在线模式下运行迁移"""
     connectable = create_engine(DATABASE_URL, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:

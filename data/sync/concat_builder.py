@@ -1,9 +1,9 @@
 """
-Concat Asset Builder
+拼接资产构建器
 
-Builds synthetic continuous assets by concatenating multiple data sources.
+通过拼接多个数据源构建合成连续资产
 
-Example: CYB_CONCAT = 创业板指 (2010-05-31 to 2011-11-15) + 创业板ETF (2011-11-16 onwards)
+示例: CYB_CONCAT = 创业板指 (2010-05-31 至 2011-11-15) + 创业板ETF (2011-11-16 起)
 """
 
 from datetime import date
@@ -24,7 +24,7 @@ class ConcatBuilder:
         self.config_loader = AssetConfigLoader()
 
     def get_active_assets(self) -> List[ConcatAsset]:
-        """Get active concat assets"""
+        """获取活跃的拼接资产"""
         return [
             asset for asset in self.config_loader.get_all_concat_assets()
             if asset.update_flag == 1
@@ -32,14 +32,14 @@ class ConcatBuilder:
 
     def build_for_date(self, symbol: str, build_date: date) -> int:
         """
-        Build concat asset for a specific date
+        为特定日期构建拼接资产
 
         Args:
-            symbol: Concat asset symbol (e.g., 'CYB_CONCAT')
-            build_date: Date to build
+            symbol: 拼接资产代码 (如 'CYB_CONCAT')
+            build_date: 构建日期
 
         Returns:
-            Number of records created (0 or 1)
+            创建的记录数 (0 或 1)
         """
         asset = self.config_loader.get_concat_asset(symbol)
         if not asset:
@@ -65,15 +65,15 @@ class ConcatBuilder:
 
     def build_for_range(self, symbol: str, start_date: date, end_date: date) -> int:
         """
-        Build concat asset for a date range
+        为日期范围构建拼接资产
 
         Args:
-            symbol: Concat asset symbol
-            start_date: Start date
-            end_date: End date
+            symbol: 拼接资产代码
+            start_date: 开始日期
+            end_date: 结束日期
 
         Returns:
-            Number of records created
+            创建的记录数
         """
         from datetime import timedelta
 
@@ -92,10 +92,10 @@ class ConcatBuilder:
 
     def build_all(self, build_date: date) -> int:
         """
-        Build all concat assets for a date
+        为某日期构建所有拼接资产
 
         Returns:
-            Total number of records created
+            创建的记录总数
         """
         assets = self.get_active_assets()
         total = 0
@@ -110,11 +110,11 @@ class ConcatBuilder:
 
     def _get_component_price(self, symbol: str, query_date: date) -> Optional[float]:
         """
-        Get closing price for a component
+        获取成分收盘价
 
-        Checks multiple tables based on symbol type
+        根据代码类型检查多个表
         """
-        # Try prices_index
+        # 尝试 prices_index
         result = self.db.execute("""
             SELECT close FROM prices_index
             WHERE symbol = %s AND date = %s
@@ -124,7 +124,7 @@ class ConcatBuilder:
         if row and row[0]:
             return row[0]
 
-        # Try prices_stock (for ETFs)
+        # 尝试 prices_stock（用于ETF）
         result = self.db.execute("""
             SELECT close FROM prices_stock
             WHERE symbol = %s AND date = %s
@@ -134,8 +134,8 @@ class ConcatBuilder:
         if row and row[0]:
             return row[0]
 
-        # Try prices_future_continuous (for futures-based components)
-        # Extract config_id from symbol if it's a continuous contract
+        # 尝试 prices_future_continuous（用于期货成分）
+        # 如果是连续合约，从代码中提取 config_id
         if '_S' in symbol or '_D' in symbol:
             result = self.db.execute("""
                 SELECT continuous_price FROM prices_future_continuous
@@ -155,9 +155,9 @@ class ConcatBuilder:
         price: float,
         source_symbol: str
     ):
-        """Store concat price to database"""
-        # Check if concat_assets table exists, if not use prices_index
-        # For simplicity, storing in a dedicated table
+        """将拼接价格存储到数据库"""
+        # 检查 concat_assets 表是否存在，不存在则使用 prices_index
+        # 为简化，存储在专用表中
 
         try:
             self.db.execute("""
@@ -191,15 +191,15 @@ class ConcatBuilder:
         end_date: date
     ) -> pd.DataFrame:
         """
-        Get concat asset history as DataFrame
+        获取拼接资产历史为 DataFrame
 
         Args:
-            symbol: Concat asset symbol
-            start_date: Start date
-            end_date: End date
+            symbol: 拼接资产代码
+            start_date: 开始日期
+            end_date: 结束日期
 
         Returns:
-            DataFrame with columns: date, close, source_symbol
+            列名为 date, close, source_symbol 的 DataFrame
         """
         result = self.db.execute("""
             SELECT date, close, source_symbol

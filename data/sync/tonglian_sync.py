@@ -1,7 +1,7 @@
 """
-Tonglian Data Synchronization
+通联数据同步
 
-Syncs futures data from Tonglian MySQL database.
+从通联 MySQL 数据库同步期货数据
 """
 
 from datetime import date
@@ -15,7 +15,7 @@ from data.database import DatabaseManager
 
 
 class TonglianSync:
-    """Tonglian data synchronizer"""
+    """通联数据同步器"""
 
     def __init__(self):
         self.source = TonglianSource()
@@ -24,29 +24,29 @@ class TonglianSync:
         self._connected = False
 
     def connect(self) -> bool:
-        """Connect to data source"""
+        """连接到数据源"""
         try:
             self.source.connect()
             self._connected = True
-            logger.info("Connected to Tonglian")
+            logger.info("已连接到通联")
             return True
         except Exception as e:
-            logger.error(f"Failed to connect to Tonglian: {e}")
+            logger.error(f"连接通联失败: {e}")
             return False
 
     def disconnect(self):
-        """Disconnect from source"""
+        """断开数据源连接"""
         if self._connected:
             self.source.close()
             self._connected = False
-            logger.info("Disconnected from Tonglian")
+            logger.info("已断开与通联的连接")
 
     def get_active_configs(self) -> List[Tuple[str, RollConfig]]:
-        """Get all active roll configurations"""
+        """获取所有活跃的展期配置"""
         return self.config_loader.get_active_roll_configs()
 
     def get_configs_for_underlying(self, underlying: str) -> List[Tuple[str, RollConfig]]:
-        """Get configs for specific underlying"""
+        """获取特定品种的配置"""
         future = self.config_loader.get_future(underlying)
         if future:
             return [(underlying, cfg) for cfg in future.get_active_configs()]
@@ -54,39 +54,39 @@ class TonglianSync:
 
     def sync_daily_data(self, underlying: str, sync_date: date, full_refresh: bool = False) -> int:
         """
-        Sync daily data for an underlying
+        同步品种的日频数据
 
         Args:
-            underlying: Underlying code (e.g., 'RB', 'IF')
-            sync_date: Date to sync
-            full_refresh: If True, delete existing data first
+            underlying: 品种代码 (如 'RB', 'IF')
+            sync_date: 同步日期
+            full_refresh: 如果为 True，先删除现有数据
 
         Returns:
-            Number of records imported
+            导入的记录数
         """
-        # Get future config
+        # 获取期货配置
         future = self.config_loader.get_future(underlying)
         if not future:
-            raise ValueError(f"Unknown underlying: {underlying}")
+            raise ValueError(f"未知品种: {underlying}")
 
-        # Query Tonglian for all contracts of this underlying on this date
-        # Uses mkt_futd table with TICKER_SYMBOL, TRADE_DATE, CONTRACT_OBJECT fields
+        # 从通联查询该品种在该日期的所有合约
+        # 使用 mkt_futd 表的 TICKER_SYMBOL, TRADE_DATE, CONTRACT_OBJECT 字段
         df = self.source.get_contracts_by_date(underlying, sync_date)
 
 
         if df.empty:
-            logger.debug(f"No data for {underlying} on {sync_date}")
+            logger.debug(f"{underlying} 在 {sync_date} 无数据")
             return 0
 
-        # Insert into database
+        # 插入数据库
         if full_refresh:
-            # Delete existing data first
+            # 先删除现有数据
             self.db.execute(
                 "DELETE FROM prices_future WHERE underlying = %s AND date = %s",
                 (underlying, sync_date)
             )
 
-        # Insert data
+        # 插入数据
         records = df.to_dict('records')
         for record in records:
             self.db.execute("""
@@ -110,5 +110,5 @@ class TonglianSync:
                 record['volume'], record['amount'], record['open_interest']
             ))
 
-        logger.debug(f"Imported {len(records)} records for {underlying} on {sync_date}")
+        logger.debug(f"已为 {underlying} 导入 {len(records)} 条记录，日期: {sync_date}")
         return len(records)

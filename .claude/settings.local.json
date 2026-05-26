@@ -12,7 +12,8 @@
       "Bash(git push *)",
       "Bash(grep -r \"^\\\\s*#.*[a-zA-Z]\\\\{3,\\\\}\" --include=\"*.py\" data/ scripts/ tests/ research/ alembic/)",
       "Bash(grep -r \"^\\\\s*#.*[a-zA-Z]\\\\{3,\\\\}\" --include=\"*.py\" data/ scripts/ tests/ research/ alembic/ strategies/ models/ config/ backtest/)",
-      "Bash(grep -r '\"\"\".*[a-zA-Z]\\\\{5,\\\\}' --include=\"*.py\" data/ scripts/ tests/ research/)"
+      "Bash(grep -r '\"\"\".*[a-zA-Z]\\\\{5,\\\\}' --include=\"*.py\" data/ scripts/ tests/ research/)",
+      "Bash(grep -rn \"^\\\\s*#.*[a-zA-Z]\\\\{4,\\\\}\" --include=\"*.py\" .)"
     ]
   }
 }
