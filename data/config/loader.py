@@ -11,7 +11,7 @@ from datetime import date
 
 from data.config.models import (
     Exchange,
-    RolloverConfig,
+    RollConfig,
     FutureAsset,
     IndexAsset,
     ETFAsset,
@@ -116,7 +116,7 @@ class AssetConfigLoader:
         self.ensure_loaded()
         return [f for f in self.futures.values() if f.exchange == exchange]
 
-    def get_roll_config(self, config_id: str) -> Optional[RolloverConfig]:
+    def get_roll_config(self, config_id: str) -> Optional[RollConfig]:
         """
         获取展期配置
 
@@ -134,7 +134,7 @@ class AssetConfigLoader:
             return future.get_config(config_id)
         return None
 
-    def get_all_roll_configs(self) -> List[Tuple[str, RolloverConfig]]:
+    def get_all_roll_configs(self) -> List[Tuple[str, RollConfig]]:
         """
         获取所有展期配置
 
@@ -148,7 +148,7 @@ class AssetConfigLoader:
                 configs.append((underlying, cfg))
         return configs
 
-    def get_active_roll_configs(self) -> List[Tuple[str, RolloverConfig]]:
+    def get_active_roll_configs(self) -> List[Tuple[str, RollConfig]]:
         """
         获取所有启用的展期配置
 

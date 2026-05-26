@@ -14,7 +14,7 @@ from data.config.models import RolloverType, PriceType, ConditionType
 
 
 @dataclass
-class DBRolloverConfig:
+class DBRollConfig:
     """来自数据库的展期配置"""
     config_id: str
     underlying: str
@@ -33,7 +33,7 @@ class SyncConfigLoader:
     def __init__(self):
         self.db = DatabaseManager()
 
-    def get_active_roll_configs(self, data_source: Optional[str] = None) -> List[DBRolloverConfig]:
+    def get_active_roll_configs(self, data_source: Optional[str] = None) -> List[DBRollConfig]:
         """
         从数据库获取活跃的展期配置
 
@@ -41,7 +41,7 @@ class SyncConfigLoader:
             data_source: 按数据源筛选（可选）
 
         Returns:
-            DBRolloverConfig 列表
+            DBRollConfig 列表
         """
         sql = """
             SELECT config_id, underlying, roll_type, price_type,
@@ -62,7 +62,7 @@ class SyncConfigLoader:
 
         configs = []
         for row in result.fetchall():
-            configs.append(DBRolloverConfig(
+            configs.append(DBRollConfig(
                 config_id=row[0],
                 underlying=row[1],
                 roll_type=RolloverType(row[2]),
@@ -76,7 +76,7 @@ class SyncConfigLoader:
 
         return configs
 
-    def get_config(self, config_id: str) -> Optional[DBRolloverConfig]:
+    def get_config(self, config_id: str) -> Optional[DBRollConfig]:
         """获取特定展期配置"""
         result = self.db.execute("""
             SELECT config_id, underlying, roll_type, price_type,
@@ -90,7 +90,7 @@ class SyncConfigLoader:
         if not row:
             return None
 
-        return DBRolloverConfig(
+        return DBRollConfig(
             config_id=row[0],
             underlying=row[1],
             roll_type=RolloverType(row[2]),

@@ -61,7 +61,7 @@ class AssetClass(Enum):
 
 
 @dataclass
-class RolloverConfig:
+class RollConfig:
     """展期配置"""
     config_id: str                    # 配置唯一ID，如 "IF_S7q4_settle"
     config_name: str                  # 配置名称
@@ -119,7 +119,7 @@ class FutureAsset:
     multiplier: Optional[float] = None  # 合约乘数
     tick_size: Optional[float] = None   # 最小变动单位
     contract_months: List[int] = field(default_factory=list)  # 合约月份列表
-    configs: List[RolloverConfig] = field(default_factory=list)  # 展期配置列表
+    configs: List[RollConfig] = field(default_factory=list)  # 展期配置列表
 
     def __post_init__(self):
         """初始化后处理"""
@@ -127,7 +127,7 @@ class FutureAsset:
             self.exchange = Exchange(self.exchange)
         if isinstance(self.configs, list) and len(self.configs) > 0:
             if isinstance(self.configs[0], dict):
-                self.configs = [RolloverConfig(**cfg) for cfg in self.configs]
+                self.configs = [RollConfig(**cfg) for cfg in self.configs]
 
     def get_contract_code(self, year: int, month: int) -> str:
         """
@@ -197,14 +197,14 @@ class FutureAsset:
 
         raise ValueError(f"Invalid contract code: {code} for exchange {self.exchange.value}")
 
-    def get_config(self, config_id: str) -> Optional[RolloverConfig]:
+    def get_config(self, config_id: str) -> Optional[RollConfig]:
         """获取指定ID的展期配置"""
         for cfg in self.configs:
             if cfg.config_id == config_id:
                 return cfg
         return None
 
-    def get_active_configs(self) -> List[RolloverConfig]:
+    def get_active_configs(self) -> List[RollConfig]:
         """获取所有启用的展期配置"""
         return [cfg for cfg in self.configs if cfg.update_flag == 1]
 

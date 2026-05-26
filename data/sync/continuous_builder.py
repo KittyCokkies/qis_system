@@ -10,7 +10,7 @@ from typing import Optional, List
 from loguru import logger
 
 from data.config.loader import AssetConfigLoader
-from data.config.models import RolloverConfig, RollType, PriceType
+from data.config.models import RollConfig, RollType, PriceType
 from data.database import DatabaseManager
 from data.future_roll import FutureRollAnalyzer
 
@@ -194,7 +194,7 @@ class ContinuousContractBuilder:
         underlying: str,
         contracts: List[str],
         query_date: date,
-        config: RolloverConfig
+        config: RollConfig
     ) -> tuple:
         """
         确定当前合约和下一合约
@@ -252,7 +252,7 @@ class ContinuousContractBuilder:
         current_contract: str,
         next_contract: str,
         query_date: date,
-        config: RolloverConfig
+        config: RollConfig
     ) -> bool:
         """
         根据动态条件检查是否应该展期

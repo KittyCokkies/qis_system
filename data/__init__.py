@@ -12,7 +12,6 @@ from data.data_manager import DataManager
 from data.future_roll import (
     FutureRollAnalyzer,
     RolloverStrategyAdapter,
-    RollConfig,
     RollPriceType,
     RollSignalType,
 )
@@ -31,7 +30,6 @@ __all__ = [
     "DataManager",
     "FutureRollAnalyzer",
     "RolloverStrategyAdapter",
-    "RollConfig",
     "RollPriceType",
     "RollSignalType",
 ]

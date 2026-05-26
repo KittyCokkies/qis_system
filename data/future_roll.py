@@ -16,6 +16,7 @@ import numpy as np
 from loguru import logger
 
 from data.tonglian_source import TonglianSource
+from data.config.models import RollType, PriceType
 
 
 class RollPriceType(str, Enum):
@@ -32,29 +33,6 @@ class RollSignalType(str, Enum):
     COMBINED = "combined"             # 持仓量+成交量综合
     LIQUIDITY = "liquidity"           # 流动性评分（持仓量*成交量）
     STATIC_CALENDAR = "static_calendar"  # 固定日历换月：到期前固定天数换到下月
-
-
-@dataclass
-class RollConfig:
-    """展期配置
-
-    Attributes:
-        price_type: 结算价格类型
-        signal_type: 主力合约识别方式
-        days_before_expiry: 到期前N天开始考虑换仓
-        min_roll_days: 最小展期天数（避免到期日换仓）
-        weights: 综合评分权重
-    """
-    price_type: RollPriceType = RollPriceType.CLOSE
-    signal_type: RollSignalType = RollSignalType.OPEN_INTEREST
-    days_before_expiry: int = 5       # 到期前N天开始考虑换仓
-    min_roll_days: int = 3            # 最小展期天数（避免到期日换仓）
-    weights: Dict[str, float] = None  # 综合评分权重（如使用COMBINED）
-
-    def __post_init__(self):
-        """初始化后处理，设置默认权重"""
-        if self.weights is None:
-            self.weights = {"open_interest": 0.6, "volume": 0.4}
 
 
 class FutureRollAnalyzer:
@@ -283,7 +261,7 @@ class FutureRollAnalyzer:
         Returns:
             DataFrame with 'is_main' column标记主力合约
         """
-        signal_type = signal_type or self.config.signal_type
+        signal_type = signal_type or self.signal_type
 
         # 按日期分组
         result = []
