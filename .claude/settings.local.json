@@ -8,7 +8,11 @@
       "Bash(.venv/Scripts/python scripts/sync_tonglian_smart.py --underlyings IF)",
       "Bash(.venv/Scripts/python *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'Update prices_future table structure and add smart sync script *)"
+      "Bash(git commit -m 'Update prices_future table structure and add smart sync script *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git commit -m 'Cleanup project files *)"
     ]
   }
 }
