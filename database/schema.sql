@@ -76,7 +76,6 @@ CREATE INDEX idx_prices_stock_date ON prices_stock(date);
 
 -- 期货价格表（原始合约数据）
 CREATE TABLE IF NOT EXISTS prices_future (
-    id BIGSERIAL PRIMARY KEY,
     symbol VARCHAR(20) NOT NULL,                  -- 合约代码，如 "IF2401"
     underlying VARCHAR(10) NOT NULL,              -- 品种代码，如 "IF"
     date DATE NOT NULL,                           -- 交易日期
@@ -89,7 +88,8 @@ CREATE TABLE IF NOT EXISTS prices_future (
     amount DECIMAL(20, 4),                        -- 成交金额
     open_interest BIGINT,                         -- 持仓量
     basis DECIMAL(12, 4),                         -- 基差
-    UNIQUE(symbol, date),
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- 数据写入时间
+    PRIMARY KEY (symbol, date),
     FOREIGN KEY (symbol) REFERENCES assets(symbol) ON DELETE CASCADE
 );
 

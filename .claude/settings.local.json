@@ -1,20 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pip list *)",
-      "Bash(findstr /i \"numpy pandas akshare tushare sqlalchemy\")",
-      "Bash(python *)",
-      "Bash(.venv/Scripts/python.exe -m pip list)",
-      "Bash(.venv/Scripts/python.exe *)",
-      "Bash(ping *)",
+      "Bash(git reset *)",
+      "Bash(git checkout *)",
+      "Bash(.venv/Scripts/python scripts/sync_tonglian_full.py)",
+      "Bash(.venv/Scripts/python scripts/sync_daily.py --source tonglian)",
+      "Bash(.venv/Scripts/python scripts/sync_tonglian_smart.py --underlyings IF)",
+      "Bash(.venv/Scripts/python *)",
       "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
-      "Bash(grep -r \"^\\\\s*#.*[a-zA-Z]\\\\{3,\\\\}\" --include=\"*.py\" data/ scripts/ tests/ research/ alembic/)",
-      "Bash(grep -r \"^\\\\s*#.*[a-zA-Z]\\\\{3,\\\\}\" --include=\"*.py\" data/ scripts/ tests/ research/ alembic/ strategies/ models/ config/ backtest/)",
-      "Bash(grep -r '\"\"\".*[a-zA-Z]\\\\{5,\\\\}' --include=\"*.py\" data/ scripts/ tests/ research/)",
-      "Bash(grep -rn \"^\\\\s*#.*[a-zA-Z]\\\\{4,\\\\}\" --include=\"*.py\" .)",
-      "Bash(GIT_CURL_VERBOSE=1 git push origin main)"
+      "Bash(git commit -m 'Update prices_future table structure and add smart sync script *)"
     ]
   }
 }

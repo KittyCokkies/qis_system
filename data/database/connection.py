@@ -88,9 +88,9 @@ class DatabaseConnection:
             >>> db.execute("INSERT INTO assets (symbol) VALUES (:symbol)",
             ...            {"symbol": "IF2401"})
         """
-        with self.engine.connect() as conn:
+        with self.engine.begin() as conn:
             result = conn.execute(text(sql), params or {})
-            conn.commit()
+            
             return result
 
     def execute_query(self, sql: str, params: Optional[dict] = None):
@@ -110,7 +110,7 @@ class DatabaseConnection:
             ...                         {"date": "2024-01-01"})
         """
         import pandas as pd
-        with self.engine.connect() as conn:
+        with self.engine.begin() as conn:
             return pd.read_sql(text(sql), conn, params=params)
 
     def create_tables(self):
@@ -132,13 +132,13 @@ class DatabaseConnection:
         # 分割并执行语句
         statements = [s.strip() for s in sql_content.split(';') if s.strip()]
 
-        with self.engine.connect() as conn:
+        with self.engine.begin() as conn:
             for stmt in statements:
                 if stmt and not stmt.startswith('--'):
                     try:
                         conn.execute(text(stmt))
                     except Exception as e:
                         logger.warning(f"Statement failed (may already exist): {e}")
-            conn.commit()
+            
 
         logger.info("Database tables created")

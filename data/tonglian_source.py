@@ -82,8 +82,13 @@ class TonglianSource(DataSourceBase):
             return pd.DataFrame()
 
         try:
+            from sqlalchemy import text
+            # 使用 SQLAlchemy 的 execute 方法
             with self.engine.connect() as conn:
-                return pd.read_sql(text(sql), conn, params=params)
+                result = conn.execute(text(sql), params or {})
+                # 转换为 DataFrame
+                df = pd.DataFrame(result.fetchall(), columns=result.keys())
+                return df
         except Exception as e:
             logger.error(f"Query failed: {e}\nSQL: {sql}")
             return pd.DataFrame()

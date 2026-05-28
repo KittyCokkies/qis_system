@@ -103,7 +103,8 @@ class TonglianSync:
                     settle = EXCLUDED.settle,
                     volume = EXCLUDED.volume,
                     amount = EXCLUDED.amount,
-                    open_interest = EXCLUDED.open_interest
+                    open_interest = EXCLUDED.open_interest,
+                    update_time = CURRENT_TIMESTAMP
             """, {
                 "symbol": record['symbol'],
                 "underlying": underlying,
