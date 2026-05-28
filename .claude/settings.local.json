@@ -14,7 +14,8 @@
       "Bash(git stash *)",
       "Bash(git commit -m 'Cleanup project files *)",
       "Bash(:)",
-      "Bash(git commit -m 'Add batch query optimization for futures data sync *)"
+      "Bash(git commit -m 'Add batch query optimization for futures data sync *)",
+      "Bash(git commit -m 'Add Bloomberg Excel sync script *)"
     ]
   }
 }
