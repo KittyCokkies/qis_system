@@ -28,7 +28,17 @@ from data.config.loader import AssetConfigLoader
 from sqlalchemy import text
 
 logger.remove()
+
+# 生成带日期的日志文件名
+from datetime import datetime
+log_date = datetime.now().strftime('%Y-%m-%d')
+log_file = f'logs/sync_tonglian_{log_date}.log'
+
+# 控制台输出
 logger.add(sys.stdout, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+
+# 文件输出（按日期区分，方便追踪每次同步）
+logger.add(log_file, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
 
 
 class SmartTonglianSync:
@@ -232,7 +242,10 @@ class SmartTonglianSync:
             return 0
 
     def sync_underlying(self, underlying: str, full_refresh: bool = False) -> int:
-        """同步单个品种的数据"""
+        """同步单个品种的数据
+
+        优化：日期范围超过30天时使用批量查询
+        """
         # 步骤1: 导入合约信息
         self.import_contracts(underlying)
 
@@ -246,27 +259,97 @@ class SmartTonglianSync:
 
         end_date = date.today()
 
-        # 如果开始日期晚于结束日期，说明已经是最新数据
         if start_date > end_date:
             logger.info(f"[{underlying}] 数据已是最新，无需同步")
             return 0
 
-        # 步骤3: 同步价格数据
-        total_records = 0
-        current = start_date
+        days_to_sync = (end_date - start_date).days + 1
+        logger.info(f"[{underlying}] 需要同步 {days_to_sync} 天")
 
-        with tqdm(desc=f"[{underlying}] 同步进度", total=(end_date - start_date).days + 1, leave=False) as pbar:
+        # 步骤3: 选择同步策略（超过7天使用批量查询）
+        if days_to_sync > 7:
+            logger.info(f"[{underlying}] 日期范围较大，使用批量查询模式")
+            return self.sync_underlying_batch(underlying, start_date, end_date)
+        else:
+            # 增量模式：逐日同步
+            total_records = 0
+            current = start_date
             while current <= end_date:
                 try:
                     records = self.sync.sync_daily_data(underlying, current, full_refresh=full_refresh)
                     total_records += records
                 except Exception as e:
                     logger.error(f"同步 {underlying} {current} 失败: {e}")
-
                 current += timedelta(days=1)
-                pbar.update(1)
+            logger.info(f"[{underlying}] 同步完成: {total_records} 条记录")
+            return total_records
 
-        logger.info(f"[{underlying}] 同步完成: {total_records} 条记录 ({start_date} 至 {end_date})")
+
+    def sync_underlying_batch(self, underlying: str, start_date: date, end_date: date) -> int:
+        """批量同步品种数据（一次性查询日期范围）
+
+        Args:
+            underlying: 品种代码
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            同步记录数
+        """
+        from datetime import datetime
+
+        logger.info(f"[{underlying}] 批量同步，从 {start_date} 至 {end_date}")
+
+        # 一次性查询整个日期范围的数据
+        df = self.source.get_contracts_by_date_range(
+            underlying,
+            datetime.combine(start_date, datetime.min.time()),
+            datetime.combine(end_date, datetime.min.time())
+        )
+
+        if df.empty:
+            logger.warning(f"[{underlying}] 无数据")
+            return 0
+
+        # 按日期分组处理
+        total_records = 0
+        grouped = df.groupby(df['date'].dt.date)
+
+        for trade_date, day_df in grouped:
+            records = day_df.to_dict('records')
+            for record in records:
+                self.db.execute("""
+                    INSERT INTO prices_future
+                    (symbol, underlying, date, open, high, low, close, settle,
+                     volume, amount, open_interest)
+                    VALUES (:symbol, :underlying, :date, :open, :high, :low, :close, :settle,
+                     :volume, :amount, :open_interest)
+                    ON CONFLICT (symbol, date) DO UPDATE SET
+                        open = EXCLUDED.open,
+                        high = EXCLUDED.high,
+                        low = EXCLUDED.low,
+                        close = EXCLUDED.close,
+                        settle = EXCLUDED.settle,
+                        volume = EXCLUDED.volume,
+                        amount = EXCLUDED.amount,
+                        open_interest = EXCLUDED.open_interest,
+                        update_time = CURRENT_TIMESTAMP
+                """, {
+                    "symbol": record['symbol'],
+                    "underlying": underlying,
+                    "date": trade_date,
+                    "open": record['open'],
+                    "high": record['high'],
+                    "low": record['low'],
+                    "close": record['close'],
+                    "settle": record['settle'],
+                    "volume": record['volume'],
+                    "amount": record['amount'],
+                    "open_interest": record['open_interest']
+                })
+            total_records += len(records)
+
+        logger.info(f"[{underlying}] 批量同步完成: {total_records} 条记录")
         return total_records
 
     def run(self, full_refresh: bool = False, underlyings: Optional[List[str]] = None):

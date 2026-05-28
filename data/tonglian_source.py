@@ -492,6 +492,50 @@ class TonglianSource(DataSourceBase):
 
         return df
 
+
+
+    def get_contracts_by_date_range(
+        self,
+        contract_object: str,
+        start_date: datetime,
+        end_date: datetime
+    ) -> pd.DataFrame:
+        """获取某品种在日期范围内的所有合约数据（一次性查询）
+
+        表: mkt_futd
+        """
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+
+        sql = f"""
+            SELECT
+                TICKER_SYMBOL as symbol,
+                TRADE_DATE as date,
+                OPEN_PRICE as open,
+                HIGHEST_PRICE as high,
+                LOWEST_PRICE as low,
+                CLOSE_PRICE as close,
+                SETTL_PRICE as settle,
+                TURNOVER_VOL as volume,
+                TURNOVER_VALUE as amount,
+                OPEN_INT as open_interest,
+                LAST_TRADE_DATE as expiry_date,
+                MAINCON as is_main_contract,
+                SMAINCON as is_sub_main_contract
+            FROM mkt_futd
+            WHERE CONTRACT_OBJECT = '{contract_object}'
+            AND TRADE_DATE BETWEEN '{start_str}' AND '{end_str}'
+            ORDER BY TICKER_SYMBOL, TRADE_DATE
+        """
+
+        df = self._execute_query(sql)
+
+        if not df.empty:
+            df["date"] = pd.to_datetime(df["date"])
+            df["expiry_date"] = pd.to_datetime(df["expiry_date"])
+
+        return df
+
     def get_option_daily(
         self,
         symbol: str,
