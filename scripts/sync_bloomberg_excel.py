@@ -46,15 +46,15 @@ SYMBOL_CATEGORIES = {
         'SGIXBRX Index', 'IND1JP10 Index', 'SGBVRES1 Index', 'SGBVRNQ1 Index',
         'SGBVRGX1 Index', 'SGBVRNK1 Index', 'SGBVRVG1 Index', 'SGICGCSR Index',
         'SGICCOSR Index', 'SGICHGSR Index', 'SGBVRHC1 Index', 'SGIXTFMM Index',
-        'UBCSR9TS Index', 'XUBSR9TD Index', 'UBCSGWHV Index', 'COMCRRY INDEX',
-        'BNPXF3PX INDEX', 'BNPXD6XC INDEX', 'BPMMMTWU INDEX', 'BNPXCDXS INDEX',
-        'BNPXTDUN INDEX', 'BNPXTPRH INDEX', 'BNPXTPRU INDEX', 'BNPXTPRE INDEX',
-        'BNPXTPRJ INDEX', 'UBCSSWMP Index', 'UBCSSW2P Index', 'XUBSTUL1 Index',
-        'JPUS2525 Index', 'JPOSHVSN Index', 'JPUSNQIM INDEX', 'JPOSIVSS INDEX',
-        'JPOSCUVS INDEX', 'JPOSVWHU INDEX', 'JPOSSVV1 Index', 'JCUBUXY1 INDEX',
-        'JPCVMM02 INDEX', 'JMABLCCU Index', 'JMABSKNS INDEX', 'BCOMTR INDEX',
-        'LEGATRUU INDEX', 'DYN225', 'JPUSNQTL Index', 'JPOSIGN2 Index',
-        'JMAB618E Index'
+        'UBCSR9TS Index', 'XUBSR9TD Index', 'UBCSGWHV Index', 'COMCRRY Index',
+        'BNPXF3PX Index', 'BNPXD6XC Index', 'BPMMMTWU Index', 'BNPXCDXS Index',
+        'BNPXTDUN Index', 'BNPXTPRH Index', 'BNPXTPRU Index', 'BNPXTPRE Index',
+        'BNPXTPRJ Index', 'UBCSSWMP Index', 'UBCSSW2P Index', 'XUBSTUL1 Index',
+        'JPUS2525 Index', 'JPOSHVSN Index', 'JPUSNQIM Index', 'JPOSIVSS Index',
+        'JPOSCUVS Index', 'JPOSVWHU Index', 'JPOSSVV1 Index', 'JCUBUXY1 Index',
+        'JPCVMM02 Index', 'JMABLCCU Index', 'JMABSKNS Index', 'BCOMTR Index',
+        'LEGATRUU Index', 'DYN225', 'JPUSNQTL Index', 'JPOSIGN2 Index',
+        'JMAB618E Index', 'ECHINXT CH Equity'
     ],
     # 外汇 -> fx_rates
     'fx': [
@@ -161,6 +161,7 @@ class BloombergExcelSync:
                     ON CONFLICT (symbol) DO NOTHING
                 ''', {
                     'symbol': internal_symbol,
+                    'underlying': internal_symbol,
                     'name': symbol,
                     'asset_class': 'index',
                     'exchange': 'BLOOMBERG',
