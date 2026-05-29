@@ -246,7 +246,8 @@ class WindDataSync:
             sql_str += " AND to_currency = 'USD'"
 
         try:
-            existing_data = pd.read_sql(text(sql_str), self.db.engine, params={'asset_id': swifquant_id})
+            with self.db.engine.connect() as conn:
+                existing_data = pd.read_sql(text(sql_str), conn, params={'asset_id': swifquant_id})
         except Exception as e:
             logger.warning(f"[{ticker}] 查询数据库失败: {e}，假设为新数据")
             existing_data = pd.DataFrame(columns=['trade_date', 'asset_id', 'quote'])
