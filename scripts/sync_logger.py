@@ -26,14 +26,16 @@ def setup_logger(script_name: str):
     log_date = datetime.now().strftime('%Y-%m-%d')
     log_file = f'logs/sync_{script_name}_{log_date}.log'
 
-    # 统一格式: 时间 | 级别 | 脚本名 | 消息
-    log_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {extra[script]:<15} | {message}"
+    # 定义格式化函数，处理缺失的 extra 字段
+    def format_record(record):
+        record["extra"].setdefault("script", "UNKNOWN")
+        return "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {extra[script]:<15} | {message}\n"
 
     # 添加控制台输出
     logger.add(
         sys.stdout,
         level="INFO",
-        format=log_format,
+        format=format_record,
         colorize=True
     )
 
@@ -41,7 +43,7 @@ def setup_logger(script_name: str):
     logger.add(
         log_file,
         level="INFO",
-        format=log_format,
+        format=format_record,
         rotation="1 day",
         retention="7 days",
         encoding="utf-8"
