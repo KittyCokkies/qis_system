@@ -35,8 +35,8 @@ log_date = datetime.now().strftime('%Y-%m-%d')
 logger.add(sys.stdout, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
 logger.add(f'logs/sync_wind_{log_date}.log', level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
 
-# 配置文件路径
-CONFIG_FILE = Path('F:/airflow_qis/local/config_wind_etl.xlsx')
+# 导入项目内配置
+from scripts.wind_config import get_config_df
 
 
 def get_swifquant_asset_id(row) -> str:
@@ -78,9 +78,7 @@ class WindDataSync:
 
     def _load_config(self) -> pd.DataFrame:
         """加载配置文件"""
-        if not CONFIG_FILE.exists():
-            raise FileNotFoundError(f"配置文件不存在: {CONFIG_FILE}")
-        df = pd.read_excel(CONFIG_FILE)
+        df = get_config_df()
         logger.info(f"加载配置: {len(df)} 条数据")
         return df
 
