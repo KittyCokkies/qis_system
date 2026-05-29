@@ -64,13 +64,13 @@ class WindDataSync:
         if process_date is None:
             today = datetime.today()
             if today.weekday() == 0:  # 周一
-                self.process_date = today - timedelta(days=3)
+                self.process_date = (today - timedelta(days=3)).date()
             elif today.weekday() == 6:  # 周日
-                self.process_date = today - timedelta(days=2)
+                self.process_date = (today - timedelta(days=2)).date()
             else:
-                self.process_date = today - timedelta(days=1)
+                self.process_date = (today - timedelta(days=1)).date()
         else:
-            self.process_date = process_date
+            self.process_date = process_date.date() if hasattr(process_date, 'date') else process_date
 
         self._init_wind_api()
 
@@ -96,7 +96,7 @@ class WindDataSync:
         """执行同步"""
         logger.info("="*80)
         logger.info("万得数据同步开始")
-        logger.info(f"处理日期: {self.process_date.date()}")
+        logger.info(f"处理日期: {self.process_date}")
         logger.info(f"模式: {'全量刷新' if full_refresh else '增量同步'}")
         logger.info("="*80)
 
@@ -112,31 +112,49 @@ class WindDataSync:
         for _, row in config.iterrows():
             ticker = row['tickers']
             try:
-                # 1. 提取数据
-                raw_data = self.extract(row)
+                # 1. 确定同步日期范围
+                if full_refresh:
+                    # 全量刷新：使用配置的start_date
+                    sync_start_date = row['start_date']
+                    logger.info(f"[{ticker}] 全量刷新模式")
+                else:
+                    # 增量同步：查询最后同步日期
+                    table_name = row['table_name']
+                    asset_type = row.get('分类', '')
+                    last_date = self._get_last_sync_date(ticker, table_name, asset_type)
+
+                    if last_date:
+                        # 从最后日期的下一天开始
+                        next_date = last_date + timedelta(days=1)
+                        if next_date > self.process_date:
+                            # 数据已是最新，无需同步
+                            logger.info(f"[{ticker}] 数据已是最新（最后同步: {last_date}），跳过")
+                            total_stats['skipped'] += 1
+                            continue
+                        sync_start_date = next_date.strftime('%Y-%m-%d')
+                        logger.info(f"[{ticker}] 增量同步，最后同步日期: {last_date}，从 {sync_start_date} 开始")
+                    else:
+                        # 无历史数据，从配置start_date开始
+                        sync_start_date = row['start_date']
+                        logger.info(f"[{ticker}] 首次同步，从 {sync_start_date} 开始")
+
+                # 2. 提取数据
+                raw_data = self.extract(row, sync_start_date)
                 if raw_data is None or raw_data.empty:
-                    logger.warning(f"[{ticker}] 无数据返回，跳过")
+                    logger.info(f"[{ticker}] 无新数据需要同步")
                     total_stats['skipped'] += 1
                     continue
 
-                # 2. 数据转换
+                # 3. 数据转换
                 transformed_data = self.transform(row, raw_data)
 
-                # 3. 数据质量检查（检查一致性，筛选增量数据）
-                is_qualified, load_data = self.quality_check(row, transformed_data, full_refresh)
-
-                if not is_qualified:
-                    logger.error(f"[{ticker}] 数据质量检查失败，跳过")
-                    total_stats['failed'] += 1
-                    continue
-
-                if load_data.empty:
-                    logger.info(f"[{ticker}] 没有新数据需要更新")
+                if transformed_data.empty:
+                    logger.info(f"[{ticker}] 转换后无新数据")
                     total_stats['skipped'] += 1
                     continue
 
                 # 4. 加载数据
-                self.load(row, load_data)
+                self.load(row, transformed_data)
                 total_stats['success'] += 1
 
             except Exception as e:
@@ -153,19 +171,65 @@ class WindDataSync:
 
         return total_stats
 
-    def extract(self, row) -> Optional[pd.DataFrame]:
+    def _get_last_sync_date(self, ticker: str, table_name: str, asset_type: str = '') -> Optional[date]:
+        """获取某标的在表中的最后同步日期"""
+        target_table, _ = self._get_target_table_info(table_name, asset_type, ticker)
+
+        if not target_table:
+            return None
+
+        # 根据目标表确定查询字段
+        if target_table == 'macro_indicators':
+            # 宏观指标表使用 indicator_code，存储的是 swifquant_asset_id
+            # 从配置中查找对应的 swifquant_asset_id
+            config_rows = self.config[self.config['tickers'] == ticker]
+            if not config_rows.empty:
+                swifquant_id = str(config_rows.iloc[0]['swifquant_asset_id'])
+            else:
+                swifquant_id = ticker
+            id_column = 'indicator_code'
+            id_value = swifquant_id
+        else:
+            # 其他表使用 symbol
+            id_column = 'symbol'
+            id_value = ticker
+
+        try:
+            with self.db.engine.connect() as conn:
+                result = conn.execute(text(f'''
+                    SELECT MAX(date) as last_date
+                    FROM {target_table}
+                    WHERE {id_column} = :id_value
+                '''), {'id_value': id_value})
+
+                row = result.fetchone()
+                if row and row[0]:
+                    if isinstance(row[0], str):
+                        return datetime.strptime(row[0], '%Y-%m-%d').date()
+                    # 如果是 datetime 对象，转换为 date
+                    if hasattr(row[0], 'date'):
+                        return row[0].date()
+                    return row[0]
+        except Exception as e:
+            logger.warning(f"[{ticker}] 查询最后同步日期失败: {e}")
+        return None
+
+    def extract(self, row, start_date: str = None) -> Optional[pd.DataFrame]:
         """从万得提取数据"""
         ticker = row['tickers']
-        start_date = row['start_date']
         fields = row.get('fields', '')
         options = row['options'] if pd.notna(row['options']) and isinstance(row['options'], str) else ""
         w_function = row['function']
 
-        logger.info(f"[{ticker}] 提取数据: {w_function}")
+        # 如果没有指定start_date，使用配置中的start_date
+        if start_date is None:
+            start_date = row['start_date']
+
+        logger.info(f"[{ticker}] 提取数据: {w_function} (从 {start_date} 到 {self.process_date})")
 
         if w_function == 'edb':
             # EDB经济数据库接口
-            result = w.edb(ticker, start_date, self.process_date, usedf=True)
+            result = w.edb(ticker, start_date, str(self.process_date), usedf=True)
             if result[0] == 0:
                 data = result[1]
                 data.columns = [ticker]
@@ -176,7 +240,7 @@ class WindDataSync:
 
         elif w_function == 'wsd':
             # WSD序列数据接口
-            result = w.wsd(ticker, fields, start_date, self.process_date, options, usedf=True)
+            result = w.wsd(ticker, fields, start_date, str(self.process_date), options, usedf=True)
             if result[0] == 0:
                 data = result[1]
                 data.columns = [ticker]
@@ -230,9 +294,10 @@ class WindDataSync:
             return True, transformed_data.copy()
 
         # 获取目标表信息
-        target_table, asset_col = self._get_target_table_info(table_name, row.get('分类', ''))
+        target_table, asset_col = self._get_target_table_info(table_name, row.get('分类', ''), ticker)
+
         date_col = 'date'
-        quote_col = 'close' if target_table in ['prices_stock', 'prices_index'] else ('spot_rate' if target_table == 'fx_rates' else 'value')
+        quote_col = 'close' if target_table in ['prices_stock', 'prices_index', 'prices_etf'] else ('spot_rate' if target_table == 'fx_rates' else ('nav_adj' if target_table == 'prices_fund' else 'value'))
 
         # 构建查询SQL - 对于fx_rates使用ticker作为查询条件
         query_symbol = ticker if target_table == 'fx_rates' else swifquant_id
@@ -306,13 +371,13 @@ class WindDataSync:
         logger.info(f"[{ticker}] 增量数据 {len(load_data)} 条，质量检查通过")
         return True, load_data
 
-    def _get_target_table_info(self, config_table_name: str, asset_type: str = '') -> (str, str):
+    def _get_target_table_info(self, config_table_name: str, asset_type: str = '', ticker: str = '') -> (str, str):
         """
         将配置表名映射到实际数据库表名
         返回: (实际表名, asset_id对应的数据库字段名)
         """
         table_mapping = {
-            'qis_fx_quote_info': ('fx_rates', 'from_currency'),
+            'qis_fx_quote_info': ('fx_rates', 'symbol'),
             'qis_market_data': ('macro_indicators', 'indicator_code'),
         }
 
@@ -327,8 +392,8 @@ class WindDataSync:
                 # ETF -> prices_etf
                 return ('prices_etf', 'symbol')
             elif 'otc' in asset_type or ticker.endswith('.OF'):
-                # 场外基金 -> 跳过（不存到价格表）
-                return (None, 'symbol')
+                # 场外基金 -> prices_fund（存储净值）
+                return ('prices_fund', 'symbol')
             else:
                 # 其他 -> prices_stock
                 return ('prices_stock', 'symbol')
@@ -408,15 +473,10 @@ class WindDataSync:
         # 获取表映射信息
         target_table, asset_col = self._get_target_table_info(config_table_name, asset_type)
 
-        # 跳过场外基金（.OF后缀）
-        if target_table is None:
-            logger.info(f"[{ticker}] 场外基金，跳过价格同步")
-            return
-
         logger.info(f"[{ticker}] 加载数据到 {target_table}")
 
         # 对于价格表，需要先确保资产存在
-        if target_table in ['prices_stock', 'prices_index', 'prices_etf', 'fx_rates']:
+        if target_table in ['prices_stock', 'prices_index', 'prices_etf', 'prices_fund', 'fx_rates']:
             # 获取资产信息
             asset_class, exchange = self._get_asset_info(row)
             self._ensure_asset_exists(ticker, asset_name, asset_class, exchange)
@@ -460,6 +520,21 @@ class WindDataSync:
                                 'period': 'daily',
                                 'value': quote,
                                 'unit': '%'
+                            }
+
+                        elif target_table == 'prices_fund':
+                            # 场外基金净值表
+                            sql = """
+                                INSERT INTO prices_fund (symbol, date, nav_adj, update_time)
+                                VALUES (:symbol, :date, :nav_adj, CURRENT_TIMESTAMP)
+                                ON CONFLICT (symbol, date) DO UPDATE SET
+                                    nav_adj = EXCLUDED.nav_adj,
+                                    update_time = CURRENT_TIMESTAMP
+                            """
+                            values = {
+                                'symbol': ticker,
+                                'date': trade_date,
+                                'nav_adj': quote
                             }
 
                         elif target_table == 'prices_etf':

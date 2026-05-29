@@ -21,7 +21,10 @@
       "Bash(sed -i 's/underlying_short/internal_symbol/g' F:/qis_system/scripts/sync_bloomberg_excel.py)",
       "Bash(sed -i '/字段长度限制10/d' F:/qis_system/scripts/sync_bloomberg_excel.py)",
       "Bash(git commit -m 'Fix database schema for Bloomberg long symbol names *)",
-      "Bash(git commit -m 'Fix DMA price sync logic in Bloomberg Excel script *)"
+      "Bash(git commit -m 'Fix DMA price sync logic in Bloomberg Excel script *)",
+      "Bash(git commit *)",
+      "Bash(python *)",
+      "Bash(del cleanup_airflow.py)"
     ]
   }
 }

@@ -108,11 +108,11 @@ class BloombergExcelSync:
                     WHERE symbol = :symbol
                 ''', {'symbol': symbol})
             elif table == 'fx_rates':
-                # 对于外汇，使用from_currency匹配
+                # 对于外汇，使用symbol匹配
                 result = self.db.execute('''
                     SELECT MAX(date) as last_date
                     FROM fx_rates
-                    WHERE from_currency = :symbol
+                    WHERE symbol = :symbol
                 ''', {'symbol': symbol})
             elif table == 'prices_future':
                 result = self.db.execute('''
@@ -225,6 +225,23 @@ class BloombergExcelSync:
         """同步外汇数据到 fx_rates"""
         logger.info(f"[{symbol}] 开始数据质量检查")
 
+        # 先确保外汇资产存在于assets表中
+        try:
+            self.db.execute('''
+                INSERT INTO assets (symbol, underlying, name, asset_class, exchange, currency, is_active)
+                VALUES (:symbol, :underlying, :name, :asset_class, :exchange, :currency, TRUE)
+                ON CONFLICT (symbol) DO NOTHING
+            ''', {
+                'symbol': symbol,
+                'underlying': symbol.split()[0] if ' ' in symbol else symbol,
+                'name': symbol,
+                'asset_class': 'fx',
+                'exchange': 'BLOOMBERG',
+                'currency': 'CNY'
+            })
+        except Exception as e:
+            logger.warning(f"[{symbol}] 添加外汇资产到assets表失败: {e}")
+
         # 获取数据库现有数据用于质量检查
         try:
             result = self.db.execute('''
@@ -298,6 +315,9 @@ class BloombergExcelSync:
         """同步DMA价格数据到 prices_future"""
         # DMA_settle/DMA_last 结构：第一列是合约代码，其他列是日期
 
+        # 从工作表名称提取品种代码（如 HCTA_settle -> HCTA）
+        underlying = sheet_name.split('_')[0] if '_' in sheet_name else 'DMA'
+
         count = 0
         # 获取合约代码列（第一列）
         contract_col = df.columns[0]
@@ -322,43 +342,78 @@ class BloombergExcelSync:
                 if pd.isna(value):
                     continue
 
-                # 判断是结算价还是最新价
+                # 判断数据类型：结算价、最新价或成交量
                 if 'settle' in sheet_name.lower():
-                    settle_val = float(value)
-                    close_val = None
+                    # 结算价
+                    try:
+                        self.db.execute('''
+                            INSERT INTO prices_future
+                            (symbol, underlying, date, settle, update_time)
+                            VALUES (:symbol, :underlying, :date, :settle, CURRENT_TIMESTAMP)
+                            ON CONFLICT (symbol, date) DO UPDATE SET
+                                settle = EXCLUDED.settle,
+                                update_time = CURRENT_TIMESTAMP
+                        ''', {
+                            'symbol': contract_code,
+                            'underlying': underlying,
+                            'date': trade_date,
+                            'settle': float(value)
+                        })
+                        count += 1
+                    except Exception as e:
+                        logger.warning(f"插入{underlying}结算价 {contract_code} {trade_date} 失败: {e}")
+
                 elif 'last' in sheet_name.lower():
-                    settle_val = None
-                    close_val = float(value)
-                else:
-                    continue
+                    # 最新价（收盘价）
+                    try:
+                        self.db.execute('''
+                            INSERT INTO prices_future
+                            (symbol, underlying, date, close, update_time)
+                            VALUES (:symbol, :underlying, :date, :close, CURRENT_TIMESTAMP)
+                            ON CONFLICT (symbol, date) DO UPDATE SET
+                                close = EXCLUDED.close,
+                                update_time = CURRENT_TIMESTAMP
+                        ''', {
+                            'symbol': contract_code,
+                            'underlying': underlying,
+                            'date': trade_date,
+                            'close': float(value)
+                        })
+                        count += 1
+                    except Exception as e:
+                        logger.warning(f"插入{underlying}收盘价 {contract_code} {trade_date} 失败: {e}")
 
-                try:
-                    self.db.execute('''
-                        INSERT INTO prices_future
-                        (symbol, underlying, date, settle, close, update_time)
-                        VALUES (:symbol, :underlying, :date, :settle, :close, CURRENT_TIMESTAMP)
-                        ON CONFLICT (symbol, date) DO UPDATE SET
-                            settle = COALESCE(EXCLUDED.settle, prices_future.settle),
-                            close = COALESCE(EXCLUDED.close, prices_future.close),
-                            update_time = CURRENT_TIMESTAMP
-                    ''', {
-                        'symbol': contract_code,
-                        'underlying': 'DMA',
-                        'date': trade_date,
-                        'settle': settle_val,
-                        'close': close_val
-                    })
-                    count += 1
-                except Exception as e:
-                    logger.warning(f"插入DMA {contract_code} {trade_date} 失败: {e}")
+                elif 'volume' in sheet_name.lower():
+                    # 成交量
+                    try:
+                        self.db.execute('''
+                            INSERT INTO prices_future
+                            (symbol, underlying, date, volume, update_time)
+                            VALUES (:symbol, :underlying, :date, :volume, CURRENT_TIMESTAMP)
+                            ON CONFLICT (symbol, date) DO UPDATE SET
+                                volume = EXCLUDED.volume,
+                                update_time = CURRENT_TIMESTAMP
+                        ''', {
+                            'symbol': contract_code,
+                            'underlying': underlying,
+                            'date': trade_date,
+                            'volume': int(float(value))
+                        })
+                        count += 1
+                    except Exception as e:
+                        logger.warning(f"插入{underlying}成交量 {contract_code} {trade_date} 失败: {e}")
 
-        logger.info(f"[{sheet_name}] 同步 {count} 条DMA价格记录到 prices_future")
+        data_type = '成交量' if 'volume' in sheet_name.lower() else '价格'
+        logger.info(f"[{sheet_name}] 同步 {count} 条{underlying}{data_type}记录到 prices_future")
         return count
 
-    def sync_dma_notice_date(self, df: pd.DataFrame) -> int:
+    def sync_dma_notice_date(self, df: pd.DataFrame, sheet_name: str) -> int:
         """同步DMA第一通知日到 assets.delist_date"""
         # DMA_ltd表结构：合约代码 + 通知日
         # 使用delist_date字段存储first_notice_date（方案A）
+
+        # 从工作表名称提取品种代码（如 HCTA_ltd -> HCTA）
+        underlying = sheet_name.split('_')[0] if '_' in sheet_name else 'DMA'
 
         count = 0
         for _, row in df.iterrows():
@@ -381,7 +436,7 @@ class BloombergExcelSync:
                     self.db.execute('''
                         UPDATE assets
                         SET delist_date = :notice_date,
-                            updated_at = CURRENT_TIMESTAMP
+                            update_time = CURRENT_TIMESTAMP
                         WHERE symbol = :symbol
                     ''', {
                         'symbol': contract_code,
@@ -397,21 +452,21 @@ class BloombergExcelSync:
                                 :is_active, :delist_date)
                         ON CONFLICT (symbol) DO UPDATE SET
                             delist_date = EXCLUDED.delist_date,
-                            updated_at = CURRENT_TIMESTAMP
+                            update_time = CURRENT_TIMESTAMP
                     ''', {
                         'symbol': contract_code,
-                        'underlying': 'DMA',
+                        'underlying': underlying,
                         'name': contract_code,
                         'asset_class': 'future',
-                        'exchange': 'CME',  # DMA通常在CME交易
+                        'exchange': 'CME',
                         'is_active': True,
-                        'delist_date': notice_date  # 方案A：存first_notice_date
+                        'delist_date': notice_date
                     })
                 count += 1
             except Exception as e:
-                logger.warning(f"更新DMA通知日 {contract_code} 失败: {e}")
+                logger.warning(f"更新{underlying}通知日 {contract_code} 失败: {e}")
 
-        logger.info(f"[DMA_ltd] 同步 {count} 条DMA通知日到 assets")
+        logger.info(f"[{sheet_name}] 同步 {count} 条{underlying}通知日到 assets")
         return count
 
     def _last_sync_date(self, table: str, symbol: str) -> Optional[date]:
@@ -476,7 +531,7 @@ class BloombergExcelSync:
                 elif category == 'dma_futures':
                     if 'ltd' in sheet_name.lower():
                         # DMA通知日 -> assets
-                        count = self.sync_dma_notice_date(df)
+                        count = self.sync_dma_notice_date(df, sheet_name)
                         total_stats['dma_notice'] += count
                     else:
                         # DMA价格 -> prices_future

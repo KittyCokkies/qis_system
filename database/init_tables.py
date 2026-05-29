@@ -194,6 +194,8 @@ def verify_tables():
         'prices_stock',
         'prices_future',
         'prices_future_continuous',
+        'prices_etf',
+        'prices_fund',
         'prices_index',
         'factors_asset',
         'factors_commodity',
