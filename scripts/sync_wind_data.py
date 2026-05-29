@@ -13,7 +13,7 @@
     python scripts/sync_wind_data.py --full-refresh  # 强制全量刷新
 
 配置来源：
-    F:\airflow_qis\local\config_wind_etl.xlsx
+    scripts/wind_config.py (项目内嵌配置)
 """
 import sys
 from pathlib import Path
@@ -244,12 +244,14 @@ class WindDataSync:
             sql_str += " AND to_currency = 'USD'"
 
         try:
-            from sqlalchemy import create_engine
-            if isinstance(self.db.engine, str):
-                engine = create_engine(self.db.engine)
-            else:
-                engine = self.db.engine
-            existing_data = pd.read_sql(sql_str, engine, params={'asset_id': swifquant_id})
+            # 使用SQLAlchemy执行查询并转为DataFrame
+            with self.db.engine.connect() as conn:
+                result = conn.execute(text(sql_str), {'asset_id': swifquant_id})
+                rows = result.fetchall()
+                if rows:
+                    existing_data = pd.DataFrame(rows, columns=result.keys())
+                else:
+                    existing_data = pd.DataFrame(columns=['trade_date', 'asset_id', 'quote'])
         except Exception as e:
             logger.warning(f"[{ticker}] 查询数据库失败: {e}，假设为新数据")
             existing_data = pd.DataFrame(columns=['trade_date', 'asset_id', 'quote'])
@@ -259,8 +261,9 @@ class WindDataSync:
             logger.info(f"[{ticker}] 数据库中无历史数据，全部作为新数据")
             return True, transformed_data.copy()
 
-        # 确保日期格式一致
+        # 确保日期格式一致，数值转为float
         existing_data['trade_date'] = pd.to_datetime(existing_data['trade_date']).dt.date
+        existing_data['quote'] = existing_data['quote'].astype(float)
 
         # 检查历史数据一致性（重叠日期部分）
         overlap_dates = set(transformed_data['trade_date']) & set(existing_data['trade_date'])
