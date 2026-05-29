@@ -238,21 +238,31 @@ class BloombergExcelSync:
 
     def sync_dma_prices(self, df: pd.DataFrame, sheet_name: str) -> int:
         """同步DMA价格数据到 prices_future"""
-        # DMA合约代码通常在前缀，如 DMZ6
-        # 需要从列名或数据中解析
+        # DMA_settle/DMA_last 结构：第一列是合约代码，其他列是日期
 
         count = 0
-        for col in df.columns[1:]:  # 跳过第一列（日期）
-            contract_code = str(col)
+        # 获取合约代码列（第一列）
+        contract_col = df.columns[0]
 
-            for _, row in df.iterrows():
-                trade_date = row.iloc[0]
+        # 遍历每一行（每个合约）
+        for _, row in df.iterrows():
+            contract_code = str(row[contract_col])
+
+            # 遍历日期列（从第二列开始）
+            for col in df.columns[1:]:
+                # 列名是日期
+                try:
+                    if isinstance(col, str):
+                        trade_date = pd.to_datetime(col).date()
+                    else:
+                        trade_date = col.date() if hasattr(col, 'date') else pd.to_datetime(col).date()
+                except:
+                    continue  # 跳过无效日期
+
                 value = row[col]
 
-                if pd.isna(trade_date) or pd.isna(value):
+                if pd.isna(value):
                     continue
-
-                trade_date = pd.to_datetime(trade_date).date()
 
                 # 判断是结算价还是最新价
                 if 'settle' in sheet_name.lower():
@@ -275,7 +285,7 @@ class BloombergExcelSync:
                             update_time = CURRENT_TIMESTAMP
                     ''', {
                         'symbol': contract_code,
-                        'underlying': 'DMA',  # DMA品种标识
+                        'underlying': 'DMA',
                         'date': trade_date,
                         'settle': settle_val,
                         'close': close_val
