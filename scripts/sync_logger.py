@@ -26,10 +26,15 @@ def setup_logger(script_name: str):
     log_date = datetime.now().strftime('%Y-%m-%d')
     log_file = f'logs/sync_{script_name}_{log_date}.log'
 
-    # 定义格式化函数，处理缺失的 extra 字段
+    # 定义格式化函数，确保对齐
+    # 格式: TIME | LEVEL | SCRIPT | MESSAGE
+    # 各列宽度: 19 | 8 | 15 | ...
     def format_record(record):
-        record["extra"].setdefault("script", "UNKNOWN")
-        return "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {extra[script]:<15} | {message}\n"
+        script = record["extra"].get("script", "UNKNOWN")
+        time_str = record["time"].strftime('%Y-%m-%d %H:%M:%S')
+        level_str = f"{record['level'].name:<8}"
+        script_str = f"{script:<15}"
+        return f"{time_str} | {level_str} | {script_str} | {record['message']}\n"
 
     # 添加控制台输出
     logger.add(
