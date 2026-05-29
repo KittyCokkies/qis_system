@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS assets (
     is_active BOOLEAN DEFAULT TRUE,               -- 是否可交易
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 数据更新时间
 
-    CONSTRAINT chk_asset_class CHECK (asset_class IN ('stock', 'future', 'index', 'etf', 'bond', 'option', 'commodity', 'fund'))
+    CONSTRAINT chk_asset_class CHECK (asset_class IN ('stock', 'future', 'index', 'etf', 'bond', 'option', 'commodity', 'fund', 'fx'))
 );
 
 CREATE INDEX idx_assets_underlying ON assets(underlying);
@@ -214,10 +214,21 @@ CREATE TABLE IF NOT EXISTS fx_rates (
     UNIQUE(from_currency, to_currency, date)
 );
 
-CREATE INDEX idx_fx_rates_pair ON fx_rates(from_currency, to_currency, date DESC);
+-- --------------------------------------------------------
+-- 4. 汇率表（使用原始代码作为symbol）
+-- --------------------------------------------------------
 
--- 为已存在的表添加 update_time 字段（如果尚不存在）
-ALTER TABLE fx_rates ADD COLUMN IF NOT EXISTS update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+CREATE TABLE IF NOT EXISTS fx_rates (
+    symbol VARCHAR(50) NOT NULL,              -- 万得代码/彭博代码，如 M0000185, EURCNH L160 Curncy
+    date DATE NOT NULL,                       -- 日期
+    spot_rate DECIMAL(12, 6),                 -- 即期汇率
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (symbol, date),
+    FOREIGN KEY (symbol) REFERENCES assets(symbol) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_fx_rates_symbol_date ON fx_rates(symbol, date DESC);
+CREATE INDEX idx_fx_rates_date ON fx_rates(date);
 
 -- --------------------------------------------------------
 -- 5. 宏观经济与市场指标表（用于择时、止损）

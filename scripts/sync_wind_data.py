@@ -237,10 +237,6 @@ class WindDataSync:
         # 构建查询SQL
         sql_str = f"SELECT {date_col} as trade_date, {asset_col} as asset_id, {quote_col} as quote FROM {target_table} WHERE {asset_col} = :asset_id"
 
-        # 对于外汇表，需要额外条件
-        if target_table == 'fx_rates':
-            sql_str += " AND to_currency = 'USD'"
-
         try:
             # 使用SQLAlchemy执行查询并转为DataFrame
             with self.db.engine.connect() as conn:
@@ -359,6 +355,43 @@ class WindDataSync:
         except Exception as e:
             logger.warning(f"[{ticker}] 添加资产信息失败: {e}")
 
+    def _get_asset_info(self, row):
+        """根据ticker获取资产信息"""
+        ticker = row['tickers']
+        asset_type = row.get('分类', '')
+
+        # 确定资产类别
+        if 'etf' in asset_type:
+            asset_class = 'etf'
+        elif 'index' in asset_type:
+            asset_class = 'index'
+        elif 'fx' in asset_type or ticker.startswith('M'):
+            asset_class = 'fx'
+        elif 'otc' in asset_type or 'fund' in asset_type:
+            asset_class = 'fund'
+        else:
+            asset_class = 'stock'
+
+        # 确定交易所
+        if '.SH' in ticker:
+            exchange = 'SSE'
+        elif '.SZ' in ticker:
+            exchange = 'SZSE'
+        elif '.OF' in ticker:
+            exchange = 'OF'
+        elif '.L' in ticker:
+            exchange = 'LSE'
+        elif '.BAT' in ticker:
+            exchange = 'BAT'
+        elif 'Curncy' in ticker:
+            exchange = 'BBG'
+        elif ticker.startswith('M'):
+            exchange = 'WIND'
+        else:
+            exchange = 'UNKNOWN'
+
+        return asset_class, exchange
+
     def load(self, row, load_data: pd.DataFrame):
         """将数据加载到数据库"""
         ticker = row['tickers']
@@ -377,27 +410,9 @@ class WindDataSync:
         logger.info(f"[{ticker}] 加载数据到 {target_table}")
 
         # 对于价格表，需要先确保资产存在
-        if target_table in ['prices_stock', 'prices_index', 'prices_etf']:
-            # 确定资产类别和交易所
-            if 'etf' in asset_type:
-                asset_class = 'etf'
-            elif 'index' in asset_type:
-                asset_class = 'index'
-            elif 'otc' in asset_type or 'fund' in asset_type:
-                asset_class = 'fund'
-            else:
-                asset_class = 'stock'
-
-            # 确定交易所
-            if '.SH' in ticker:
-                exchange = 'SSE'
-            elif '.SZ' in ticker:
-                exchange = 'SZSE'
-            elif '.OF' in ticker:
-                exchange = 'OF'
-            else:
-                exchange = 'UNKNOWN'
-
+        if target_table in ['prices_stock', 'prices_index', 'prices_etf', 'fx_rates']:
+            # 获取资产信息
+            asset_class, exchange = self._get_asset_info(row)
             self._ensure_asset_exists(ticker, asset_name, asset_class, exchange)
 
         try:
@@ -409,22 +424,17 @@ class WindDataSync:
                         quote = float(data_row['quote'])
 
                         if target_table == 'fx_rates':
-                            # 外汇表 - 需要将asset_id解析为货币对
-                            if ticker in self.FX_CURRENCY_MAP:
-                                from_curr = self.FX_CURRENCY_MAP[ticker]
-                            else:
-                                from_curr = asset_id if len(asset_id) <= 3 else 'CNY'
-
+                            # 外汇表 - 使用原始ticker作为symbol
                             sql = """
-                                INSERT INTO fx_rates (date, from_currency, to_currency, spot_rate, update_time)
-                                VALUES (:date, :from_curr, 'USD', :rate, CURRENT_TIMESTAMP)
-                                ON CONFLICT (date, from_currency, to_currency) DO UPDATE SET
+                                INSERT INTO fx_rates (symbol, date, spot_rate, update_time)
+                                VALUES (:symbol, :date, :rate, CURRENT_TIMESTAMP)
+                                ON CONFLICT (symbol, date) DO UPDATE SET
                                     spot_rate = EXCLUDED.spot_rate,
                                     update_time = CURRENT_TIMESTAMP
                             """
                             values = {
+                                'symbol': ticker,
                                 'date': trade_date,
-                                'from_curr': from_curr,
                                 'rate': quote
                             }
 

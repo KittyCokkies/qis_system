@@ -223,27 +223,15 @@ class BloombergExcelSync:
 
     def sync_fx_data(self, df: pd.DataFrame, symbol: str) -> int:
         """同步外汇数据到 fx_rates"""
-        # 解析货币对
-        if 'CNH' in symbol:
-            from_curr, to_curr = 'CNH', 'USD'
-        elif 'USDCNY' in symbol:
-            from_curr, to_curr = 'USD', 'CNY'
-        elif 'USDCNH' in symbol:
-            from_curr, to_curr = 'USD', 'CNH'
-        else:
-            # 默认提取前3个字符
-            from_curr = symbol[:3] if len(symbol) >= 3 else symbol
-            to_curr = 'USD'
-
         logger.info(f"[{symbol}] 开始数据质量检查")
 
         # 获取数据库现有数据用于质量检查
         try:
             result = self.db.execute('''
                 SELECT date, spot_rate FROM fx_rates
-                WHERE from_currency = :from_curr AND to_currency = :to_curr
+                WHERE symbol = :symbol
                 ORDER BY date
-            ''', {'from_curr': from_curr, 'to_curr': to_curr})
+            ''', {'symbol': symbol})
             existing_data = {row[0]: float(row[1]) for row in result.fetchall()}
         except Exception as e:
             logger.warning(f"[{symbol}] 查询现有数据失败: {e}")
@@ -289,20 +277,19 @@ class BloombergExcelSync:
             try:
                 self.db.execute('''
                     INSERT INTO fx_rates
-                    (from_currency, to_currency, date, spot_rate, update_time)
-                    VALUES (:from_curr, :to_curr, :date, :rate, CURRENT_TIMESTAMP)
-                    ON CONFLICT (from_currency, to_currency, date) DO UPDATE SET
+                    (symbol, date, spot_rate, update_time)
+                    VALUES (:symbol, :date, :rate, CURRENT_TIMESTAMP)
+                    ON CONFLICT (symbol, date) DO UPDATE SET
                         spot_rate = EXCLUDED.spot_rate,
                         update_time = CURRENT_TIMESTAMP
                 ''', {
-                    'from_curr': from_curr,
-                    'to_curr': to_curr,
+                    'symbol': symbol,
                     'date': trade_date,
                     'rate': float(value)
                 })
                 count += 1
             except Exception as e:
-                logger.warning(f"插入外汇 {symbol} {trade_date} 失败: {e}")
+                logger.warning(f"[{symbol}] 插入 {trade_date} 失败: {e}")
 
         logger.info(f"[{symbol}] 同步 {count} 条外汇记录到 fx_rates")
         return count
