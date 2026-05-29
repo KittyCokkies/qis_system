@@ -28,11 +28,9 @@ import pandas as pd
 
 from data.database import DatabaseManager
 
-# 日志配置
-logger.remove()
-log_date = datetime.now().strftime('%Y-%m-%d')
-logger.add(sys.stdout, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
-logger.add(f'logs/sync_bloomberg_{log_date}.log', level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+# 统一日志配置
+from scripts.sync_logger import setup_logger
+logger = setup_logger('bloomberg')
 
 # 彭博Excel文件路径
 BLOOMBERG_FILE = r'Z:\每日更新\数据\彭博\bbg_data_new.xlsx'
@@ -171,10 +169,11 @@ class BloombergExcelSync:
                 # 再插入价格数据
                 self.db.execute('''
                     INSERT INTO prices_index
-                    (symbol, date, close)
-                    VALUES (:symbol, :date, :close)
+                    (symbol, date, close, update_time)
+                    VALUES (:symbol, :date, :close, CURRENT_TIMESTAMP)
                     ON CONFLICT (symbol, date) DO UPDATE SET
-                        close = EXCLUDED.close
+                        close = EXCLUDED.close,
+                        update_time = CURRENT_TIMESTAMP
                 ''', {
                     'symbol': internal_symbol,
                     'date': trade_date,
@@ -220,10 +219,11 @@ class BloombergExcelSync:
             try:
                 self.db.execute('''
                     INSERT INTO fx_rates
-                    (from_currency, to_currency, date, spot_rate)
-                    VALUES (:from_curr, :to_curr, :date, :rate)
+                    (from_currency, to_currency, date, spot_rate, update_time)
+                    VALUES (:from_curr, :to_curr, :date, :rate, CURRENT_TIMESTAMP)
                     ON CONFLICT (from_currency, to_currency, date) DO UPDATE SET
-                        spot_rate = EXCLUDED.spot_rate
+                        spot_rate = EXCLUDED.spot_rate,
+                        update_time = CURRENT_TIMESTAMP
                 ''', {
                     'from_curr': from_curr,
                     'to_curr': to_curr,
@@ -278,8 +278,8 @@ class BloombergExcelSync:
                 try:
                     self.db.execute('''
                         INSERT INTO prices_future
-                        (symbol, underlying, date, settle, close)
-                        VALUES (:symbol, :underlying, :date, :settle, :close)
+                        (symbol, underlying, date, settle, close, update_time)
+                        VALUES (:symbol, :underlying, :date, :settle, :close, CURRENT_TIMESTAMP)
                         ON CONFLICT (symbol, date) DO UPDATE SET
                             settle = COALESCE(EXCLUDED.settle, prices_future.settle),
                             close = COALESCE(EXCLUDED.close, prices_future.close),

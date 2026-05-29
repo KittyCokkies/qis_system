@@ -27,18 +27,9 @@ from data.database import DatabaseManager
 from data.config.loader import AssetConfigLoader
 from sqlalchemy import text
 
-logger.remove()
-
-# 生成带日期的日志文件名
-from datetime import datetime
-log_date = datetime.now().strftime('%Y-%m-%d')
-log_file = f'logs/sync_tonglian_{log_date}.log'
-
-# 控制台输出
-logger.add(sys.stdout, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
-
-# 文件输出（按日期区分，方便追踪每次同步）
-logger.add(log_file, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+# 统一日志配置
+from scripts.sync_logger import setup_logger
+logger = setup_logger('tonglian')
 
 
 class SmartTonglianSync:

@@ -29,11 +29,9 @@ from data.database import DatabaseManager
 from sqlalchemy import text
 from WindPy import w
 
-# 日志配置
-logger.remove()
-log_date = datetime.now().strftime('%Y-%m-%d')
-logger.add(sys.stdout, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
-logger.add(f'logs/sync_wind_{log_date}.log', level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+# 统一日志配置
+from scripts.sync_logger import setup_logger
+logger = setup_logger('wind')
 
 # 导入项目内配置
 from scripts.wind_config import get_config_df
@@ -366,7 +364,7 @@ class WindDataSync:
         # 获取表映射信息
         target_table, asset_col = self._get_target_table_info(config_table_name, asset_type)
 
-        logger.info(f"[{ticker}] 加载数据到 {target_table} (配置表: {config_table_name})")
+        logger.info(f"[{ticker}] 加载数据到 {target_table}")
 
         # 对于prices_stock和prices_index，需要先确保资产存在
         if target_table in ['prices_stock', 'prices_index']:
@@ -404,10 +402,11 @@ class WindDataSync:
                                 from_curr = asset_id if len(asset_id) <= 3 else 'CNY'
 
                             sql = """
-                                INSERT INTO fx_rates (date, from_currency, to_currency, spot_rate)
-                                VALUES (:date, :from_curr, 'USD', :rate)
+                                INSERT INTO fx_rates (date, from_currency, to_currency, spot_rate, update_time)
+                                VALUES (:date, :from_curr, 'USD', :rate, CURRENT_TIMESTAMP)
                                 ON CONFLICT (date, from_currency, to_currency) DO UPDATE SET
-                                    spot_rate = EXCLUDED.spot_rate
+                                    spot_rate = EXCLUDED.spot_rate,
+                                    update_time = CURRENT_TIMESTAMP
                             """
                             values = {
                                 'date': trade_date,
@@ -418,10 +417,11 @@ class WindDataSync:
                         elif target_table == 'macro_indicators':
                             # 宏观指标表
                             sql = """
-                                INSERT INTO macro_indicators (indicator_code, indicator_name, date, period_type, value, unit)
-                                VALUES (:code, :name, :date, :period, :value, :unit)
+                                INSERT INTO macro_indicators (indicator_code, indicator_name, date, period_type, value, unit, update_time)
+                                VALUES (:code, :name, :date, :period, :value, :unit, CURRENT_TIMESTAMP)
                                 ON CONFLICT (indicator_code, date) DO UPDATE SET
-                                    value = EXCLUDED.value
+                                    value = EXCLUDED.value,
+                                    update_time = CURRENT_TIMESTAMP
                             """
                             values = {
                                 'code': asset_id,
@@ -433,7 +433,7 @@ class WindDataSync:
                             }
 
                         elif target_table == 'prices_stock':
-                            # 股票价格表 (ETF/股票)
+                            # 股票价格表 (ETF/股票) - 没有update_time字段
                             sql = """
                                 INSERT INTO prices_stock (symbol, date, close)
                                 VALUES (:symbol, :date, :close)
@@ -449,10 +449,11 @@ class WindDataSync:
                         elif target_table == 'prices_index':
                             # 指数价格表
                             sql = """
-                                INSERT INTO prices_index (symbol, date, close)
-                                VALUES (:symbol, :date, :close)
+                                INSERT INTO prices_index (symbol, date, close, update_time)
+                                VALUES (:symbol, :date, :close, CURRENT_TIMESTAMP)
                                 ON CONFLICT (symbol, date) DO UPDATE SET
-                                    close = EXCLUDED.close
+                                    close = EXCLUDED.close,
+                                    update_time = CURRENT_TIMESTAMP
                             """
                             values = {
                                 'symbol': ticker,
