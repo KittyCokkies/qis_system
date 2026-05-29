@@ -373,6 +373,8 @@ class WindDataSync:
                 asset_class = 'etf'
             elif 'index' in asset_type:
                 asset_class = 'index'
+            elif 'otc' in asset_type or 'fund' in asset_type:
+                asset_class = 'fund'
             else:
                 asset_class = 'stock'
 
@@ -381,6 +383,8 @@ class WindDataSync:
                 exchange = 'SSE'
             elif '.SZ' in ticker:
                 exchange = 'SZSE'
+            elif '.OF' in ticker:
+                exchange = 'OF'
             else:
                 exchange = 'UNKNOWN'
 

@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS assets (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT chk_asset_class CHECK (asset_class IN ('stock', 'future', 'index', 'etf', 'bond', 'option', 'commodity'))
+    CONSTRAINT chk_asset_class CHECK (asset_class IN ('stock', 'future', 'index', 'etf', 'bond', 'option', 'commodity', 'fund'))
 );
 
 CREATE INDEX idx_assets_underlying ON assets(underlying);
