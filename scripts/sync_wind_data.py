@@ -319,8 +319,13 @@ class WindDataSync:
         elif config_table_name == 'qis_underlying_quote_info':
             # 根据资产类型选择表
             if 'index' in asset_type:
+                # 指数 -> prices_index
                 return ('prices_index', 'symbol')
+            elif 'otc' in asset_type or ticker.endswith('.OF'):
+                # 场外基金 -> 跳过（不存到价格表）
+                return (None, 'symbol')
             else:
+                # ETF -> prices_stock
                 return ('prices_stock', 'symbol')
         else:
             return (config_table_name, 'asset_id')
@@ -363,6 +368,11 @@ class WindDataSync:
 
         # 获取表映射信息
         target_table, asset_col = self._get_target_table_info(config_table_name, asset_type)
+
+        # 跳过场外基金（.OF后缀）
+        if target_table is None:
+            logger.info(f"[{ticker}] 场外基金，跳过价格同步")
+            return
 
         logger.info(f"[{ticker}] 加载数据到 {target_table}")
 
