@@ -321,11 +321,14 @@ class WindDataSync:
             if 'index' in asset_type:
                 # 指数 -> prices_index
                 return ('prices_index', 'symbol')
+            elif 'etf' in asset_type:
+                # ETF -> prices_etf
+                return ('prices_etf', 'symbol')
             elif 'otc' in asset_type or ticker.endswith('.OF'):
                 # 场外基金 -> 跳过（不存到价格表）
                 return (None, 'symbol')
             else:
-                # ETF -> prices_stock
+                # 其他 -> prices_stock
                 return ('prices_stock', 'symbol')
         else:
             return (config_table_name, 'asset_id')
@@ -376,8 +379,8 @@ class WindDataSync:
 
         logger.info(f"[{ticker}] 加载数据到 {target_table}")
 
-        # 对于prices_stock和prices_index，需要先确保资产存在
-        if target_table in ['prices_stock', 'prices_index']:
+        # 对于价格表，需要先确保资产存在
+        if target_table in ['prices_stock', 'prices_index', 'prices_etf']:
             # 确定资产类别和交易所
             if 'etf' in asset_type:
                 asset_class = 'etf'
@@ -446,8 +449,23 @@ class WindDataSync:
                                 'unit': '%'
                             }
 
+                        elif target_table == 'prices_etf':
+                            # ETF价格表
+                            sql = """
+                                INSERT INTO prices_etf (symbol, date, close, update_time)
+                                VALUES (:symbol, :date, :close, CURRENT_TIMESTAMP)
+                                ON CONFLICT (symbol, date) DO UPDATE SET
+                                    close = EXCLUDED.close,
+                                    update_time = CURRENT_TIMESTAMP
+                            """
+                            values = {
+                                'symbol': ticker,
+                                'date': trade_date,
+                                'close': quote
+                            }
+
                         elif target_table == 'prices_stock':
-                            # 股票价格表 (ETF/股票) - 没有update_time字段
+                            # 股票价格表 - 没有update_time字段
                             sql = """
                                 INSERT INTO prices_stock (symbol, date, close)
                                 VALUES (:symbol, :date, :close)
