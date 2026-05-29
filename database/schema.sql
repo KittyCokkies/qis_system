@@ -74,6 +74,9 @@ CREATE TABLE IF NOT EXISTS prices_stock (
 CREATE INDEX idx_prices_stock_symbol_date ON prices_stock(symbol, date DESC);
 CREATE INDEX idx_prices_stock_date ON prices_stock(date);
 
+-- 为已存在的表添加 update_time 字段（如果尚不存在）
+ALTER TABLE prices_stock ADD COLUMN IF NOT EXISTS update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
 -- 期货价格表（原始合约数据）
 CREATE TABLE IF NOT EXISTS prices_future (
     symbol VARCHAR(20) NOT NULL,                  -- 合约代码，如 "IF2401"
@@ -142,6 +145,9 @@ CREATE TABLE IF NOT EXISTS prices_index (
 );
 
 CREATE INDEX idx_prices_index_symbol_date ON prices_index(symbol, date DESC);
+
+-- 为已存在的表添加 update_time 字段（如果尚不存在）
+ALTER TABLE prices_index ADD COLUMN IF NOT EXISTS update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 -- 综合价格视图（统一查询接口）
 CREATE OR REPLACE VIEW prices_unified AS
@@ -212,6 +218,9 @@ CREATE TABLE IF NOT EXISTS fx_rates (
 
 CREATE INDEX idx_fx_rates_pair ON fx_rates(from_currency, to_currency, date DESC);
 
+-- 为已存在的表添加 update_time 字段（如果尚不存在）
+ALTER TABLE fx_rates ADD COLUMN IF NOT EXISTS update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
 -- --------------------------------------------------------
 -- 5. 宏观经济与市场指标表（用于择时、止损）
 -- --------------------------------------------------------
@@ -230,6 +239,9 @@ CREATE TABLE IF NOT EXISTS macro_indicators (
 );
 
 CREATE INDEX idx_macro_ind_code ON macro_indicators(indicator_code, date DESC);
+
+-- 为已存在的表添加 update_time 字段（如果尚不存在）
+ALTER TABLE macro_indicators ADD COLUMN IF NOT EXISTS update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 -- 市场状态表（综合择时指标）
 CREATE TABLE IF NOT EXISTS market_regime (
