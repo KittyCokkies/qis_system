@@ -10,11 +10,10 @@
 
 -- 资产主表（统一管理的标的列表）
 CREATE TABLE IF NOT EXISTS assets (
-    id SERIAL PRIMARY KEY,
-    symbol VARCHAR(50) NOT NULL UNIQUE,           -- 标的代码，如 "IF2401"、"000001.SZ"
+    symbol VARCHAR(50) NOT NULL PRIMARY KEY,      -- 标的代码，如 "IF2401"、"000001.SZ"
     underlying VARCHAR(10) NOT NULL,              -- 底层品种，如 "IF"、"000001"
     name VARCHAR(100),                            -- 标的名称
-    asset_class VARCHAR(20) NOT NULL,             -- 资产类别：stock/future/index/etf/bond/option
+    asset_class VARCHAR(20) NOT NULL,             -- 资产类别：stock/future/index/etf/bond/option/fund
     exchange VARCHAR(10),                         -- 交易所：SSE/SZSE/CFFEX/SHFE/DCE/CZCE/INE
     currency VARCHAR(3) DEFAULT 'CNY',            -- 币种
     contract_month VARCHAR(6),                    -- 合约月份（期货/期权），如 "2401"
@@ -23,8 +22,7 @@ CREATE TABLE IF NOT EXISTS assets (
     multiplier DECIMAL(10, 4),                    -- 合约乘数（期货用）
     tick_size DECIMAL(10, 4),                     -- 最小变动单位
     is_active BOOLEAN DEFAULT TRUE,               -- 是否可交易
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 数据更新时间
 
     CONSTRAINT chk_asset_class CHECK (asset_class IN ('stock', 'future', 'index', 'etf', 'bond', 'option', 'commodity', 'fund'))
 );

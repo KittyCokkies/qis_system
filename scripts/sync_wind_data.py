@@ -334,21 +334,17 @@ class WindDataSync:
             return (config_table_name, 'asset_id')
 
     def _ensure_asset_exists(self, ticker: str, asset_name: str, asset_class: str, exchange: str):
-        """确保资产存在于assets表中"""
+        """确保资产存在于assets表中 - 只在资产不存在时才插入"""
         try:
             with self.db.engine.connect() as conn:
-                # 检查资产是否存在
-                result = conn.execute(
-                    text("SELECT symbol FROM assets WHERE symbol = :symbol"),
-                    {'symbol': ticker}
-                )
-                if result.fetchone() is None:
-                    # 插入新资产
-                    conn.execute(
+                with conn.begin():
+                    # 使用 INSERT ON CONFLICT DO NOTHING 避免重复插入
+                    result = conn.execute(
                         text("""
                             INSERT INTO assets (symbol, underlying, name, asset_class, exchange, is_active)
                             VALUES (:symbol, :underlying, :name, :asset_class, :exchange, TRUE)
                             ON CONFLICT (symbol) DO NOTHING
+                            RETURNING symbol
                         """),
                         {
                             'symbol': ticker,
@@ -358,9 +354,10 @@ class WindDataSync:
                             'exchange': exchange
                         }
                     )
-                    logger.info(f"[{ticker}] 已添加到assets表")
+                    if result.fetchone():
+                        logger.info(f"[{ticker}] 新资产已添加到assets表")
         except Exception as e:
-            logger.warning(f"[{ticker}] 检查/添加资产信息失败: {e}")
+            logger.warning(f"[{ticker}] 添加资产信息失败: {e}")
 
     def load(self, row, load_data: pd.DataFrame):
         """将数据加载到数据库"""
