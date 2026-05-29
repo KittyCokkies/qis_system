@@ -135,7 +135,42 @@ class BloombergExcelSync:
     def sync_index_data(self, df: pd.DataFrame, symbol: str) -> int:
         """同步指数数据到 prices_index"""
         internal_symbol = self._get_internal_symbol(symbol)
-        last_date = self._last_sync_date('prices_index', internal_symbol)
+
+        logger.info(f"[{symbol}] 开始数据质量检查")
+
+        # 获取数据库现有数据用于质量检查
+        try:
+            result = self.db.execute('''
+                SELECT date, close FROM prices_index
+                WHERE symbol = :symbol ORDER BY date
+            ''', {'symbol': internal_symbol})
+            existing_data = {row[0]: float(row[1]) for row in result.fetchall()}
+        except Exception as e:
+            logger.warning(f"[{symbol}] 查询现有数据失败: {e}")
+            existing_data = {}
+
+        last_date = max(existing_data.keys()) if existing_data else None
+
+        # 数据质量检查：验证重叠数据的一致性
+        if existing_data:
+            inconsistent_count = 0
+            for _, row in df.iterrows():
+                trade_date = row.iloc[0]
+                value = row.iloc[1]
+                if pd.notna(trade_date) and pd.notna(value):
+                    trade_date = pd.to_datetime(trade_date).date()
+                    if trade_date in existing_data:
+                        existing_val = existing_data[trade_date]
+                        new_val = float(value)
+                        if abs(existing_val - new_val) > 0.0001:
+                            inconsistent_count += 1
+                            logger.warning(f"[{symbol}] 数据不一致: {trade_date} 现有={existing_val:.4f}, 新值={new_val:.4f}")
+
+            if inconsistent_count > 0:
+                logger.error(f"[{symbol}] 发现 {inconsistent_count} 条不一致数据，跳过同步")
+                return 0
+            else:
+                logger.info(f"[{symbol}] 数据一致性检查通过")
 
         count = 0
         for _, row in df.iterrows():
@@ -165,7 +200,7 @@ class BloombergExcelSync:
                     'exchange': 'BLOOMBERG',
                     'is_active': True
                 })
-                
+
                 # 再插入价格数据
                 self.db.execute('''
                     INSERT INTO prices_index
@@ -181,9 +216,9 @@ class BloombergExcelSync:
                 })
                 count += 1
             except Exception as e:
-                logger.warning(f"插入 {symbol} {trade_date} 失败: {e}")
+                logger.warning(f"[{symbol}] 插入 {trade_date} 失败: {e}")
 
-        logger.info(f"[{symbol}] 同步 {count} 条指数记录到 prices_index")
+        logger.info(f"[{symbol}] 同步完成: {count} 条记录到 prices_index")
         return count
 
     def sync_fx_data(self, df: pd.DataFrame, symbol: str) -> int:
@@ -200,7 +235,42 @@ class BloombergExcelSync:
             from_curr = symbol[:3] if len(symbol) >= 3 else symbol
             to_curr = 'USD'
 
-        last_date = self._get_last_sync_date(from_curr, 'fx_rates')
+        logger.info(f"[{symbol}] 开始数据质量检查")
+
+        # 获取数据库现有数据用于质量检查
+        try:
+            result = self.db.execute('''
+                SELECT date, spot_rate FROM fx_rates
+                WHERE from_currency = :from_curr AND to_currency = :to_curr
+                ORDER BY date
+            ''', {'from_curr': from_curr, 'to_curr': to_curr})
+            existing_data = {row[0]: float(row[1]) for row in result.fetchall()}
+        except Exception as e:
+            logger.warning(f"[{symbol}] 查询现有数据失败: {e}")
+            existing_data = {}
+
+        last_date = max(existing_data.keys()) if existing_data else None
+
+        # 数据质量检查：验证重叠数据的一致性
+        if existing_data:
+            inconsistent_count = 0
+            for _, row in df.iterrows():
+                trade_date = row.iloc[0]
+                value = row.iloc[1]
+                if pd.notna(trade_date) and pd.notna(value):
+                    trade_date = pd.to_datetime(trade_date).date()
+                    if trade_date in existing_data:
+                        existing_val = existing_data[trade_date]
+                        new_val = float(value)
+                        if abs(existing_val - new_val) > 0.0001:
+                            inconsistent_count += 1
+                            logger.warning(f"[{symbol}] 数据不一致: {trade_date} 现有={existing_val:.6f}, 新值={new_val:.6f}")
+
+            if inconsistent_count > 0:
+                logger.error(f"[{symbol}] 发现 {inconsistent_count} 条不一致数据，跳过同步")
+                return 0
+            else:
+                logger.info(f"[{symbol}] 数据一致性检查通过")
 
         count = 0
         for _, row in df.iterrows():
