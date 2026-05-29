@@ -234,13 +234,14 @@ class WindDataSync:
         date_col = 'date'
         quote_col = 'close' if target_table in ['prices_stock', 'prices_index'] else ('spot_rate' if target_table == 'fx_rates' else 'value')
 
-        # 构建查询SQL
+        # 构建查询SQL - 对于fx_rates使用ticker作为查询条件
+        query_symbol = ticker if target_table == 'fx_rates' else swifquant_id
         sql_str = f"SELECT {date_col} as trade_date, {asset_col} as asset_id, {quote_col} as quote FROM {target_table} WHERE {asset_col} = :asset_id"
 
         try:
             # 使用SQLAlchemy执行查询并转为DataFrame
             with self.db.engine.connect() as conn:
-                result = conn.execute(text(sql_str), {'asset_id': swifquant_id})
+                result = conn.execute(text(sql_str), {'asset_id': query_symbol})
                 rows = result.fetchall()
                 if rows:
                     existing_data = pd.DataFrame(rows, columns=result.keys())
@@ -268,6 +269,11 @@ class WindDataSync:
             # 提取重叠部分数据进行比对
             new_overlap = transformed_data[transformed_data['trade_date'].isin(overlap_dates)].copy()
             db_overlap = existing_data[existing_data['trade_date'].isin(overlap_dates)].copy()
+
+            # 对于fx_rates，使用ticker作为比对键
+            merge_key = 'asset_id' if target_table != 'fx_rates' else ticker
+            new_overlap['asset_id'] = merge_key
+            db_overlap['asset_id'] = merge_key
 
             # 合并比对
             merged = new_overlap.merge(

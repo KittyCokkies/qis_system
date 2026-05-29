@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS assets (
     is_active BOOLEAN DEFAULT TRUE,               -- 是否可交易
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 数据更新时间
 
-    CONSTRAINT chk_asset_class CHECK (asset_class IN ('stock', 'future', 'index', 'etf', 'bond', 'option', 'commodity', 'fund', 'fx'))
+    CONSTRAINT chk_asset_class CHECK (asset_class IN ('stock', 'future', 'index', 'etf', 'bond', 'option', 'commodity', 'fund', 'fx', 'macro'))
 );
 
 CREATE INDEX idx_assets_underlying ON assets(underlying);
