@@ -11,7 +11,7 @@
 -- 资产主表（统一管理的标的列表）
 CREATE TABLE IF NOT EXISTS assets (
     id SERIAL PRIMARY KEY,
-    symbol VARCHAR(20) NOT NULL UNIQUE,           -- 标的代码，如 "IF2401"、"000001.SZ"
+    symbol VARCHAR(50) NOT NULL UNIQUE,           -- 标的代码，如 "IF2401"、"000001.SZ"
     underlying VARCHAR(10) NOT NULL,              -- 底层品种，如 "IF"、"000001"
     name VARCHAR(100),                            -- 标的名称
     asset_class VARCHAR(20) NOT NULL,             -- 资产类别：stock/future/index/etf/bond/option

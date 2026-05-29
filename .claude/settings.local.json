@@ -15,7 +15,12 @@
       "Bash(git commit -m 'Cleanup project files *)",
       "Bash(:)",
       "Bash(git commit -m 'Add batch query optimization for futures data sync *)",
-      "Bash(git commit -m 'Add Bloomberg Excel sync script *)"
+      "Bash(git commit -m 'Add Bloomberg Excel sync script *)",
+      "Bash(git commit -m 'Fix underlying field length issue in Bloomberg sync *)",
+      "Bash(sed -i '/underlying_short/d' F:/qis_system/scripts/sync_bloomberg_excel.py)",
+      "Bash(sed -i 's/underlying_short/internal_symbol/g' F:/qis_system/scripts/sync_bloomberg_excel.py)",
+      "Bash(sed -i '/字段长度限制10/d' F:/qis_system/scripts/sync_bloomberg_excel.py)",
+      "Bash(git commit -m 'Fix database schema for Bloomberg long symbol names *)"
     ]
   }
 }

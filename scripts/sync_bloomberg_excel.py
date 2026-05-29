@@ -155,15 +155,12 @@ class BloombergExcelSync:
 
             try:
                 # 先确保 asset 存在
-                # underlying 字段长度限制10，需要截断
-                underlying_short = internal_symbol[:10] if len(internal_symbol) > 10 else internal_symbol
                 self.db.execute('''
                     INSERT INTO assets (symbol, underlying, name, asset_class, exchange, is_active)
                     VALUES (:symbol, :underlying, :name, :asset_class, :exchange, :is_active)
                     ON CONFLICT (symbol) DO NOTHING
                 ''', {
                     'symbol': internal_symbol,
-                    'underlying': underlying_short,
                     'name': symbol,
                     'asset_class': 'index',
                     'exchange': 'BLOOMBERG',
